@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package telco.customer.v1;
+
+// Customer Service gRPC — internal inter-service communication
+// Used by: AgentOrchestrator, BillingService, CampaignService
+// REST is for external clients; gRPC is for internal service-to-service calls
+
+service CustomerService {
+  rpc GetCustomer(GetCustomerRequest) returns (CustomerResponse);
+  rpc GetCustomersBySegment(GetBySegmentRequest) returns (CustomerListResponse);
+  rpc GetCustomerProfile(GetCustomerRequest) returns (CustomerProfileResponse);
+}
+
+message GetCustomerRequest {
+  string customer_id = 1;
+}
+
+message GetBySegmentRequest {
+  string segment = 1;  // platinum | gold | silver | bronze | new | churning
+  int32 limit = 2;
+}
+
+message CustomerResponse {
+  string id = 1;
+  string name = 2;
+  string phone_number = 3;
+  string email = 4;
+  string segment = 5;
+  string subscription_plan = 6;
+  double clv_score = 7;
+  bool is_active = 8;
+}
+
+message CustomerProfileResponse {
+  CustomerResponse customer = 1;
+  int32 complaint_count = 2;
+  int32 months_active = 3;
+  double churn_risk_score = 4;
+  repeated string recent_complaints = 5;
+}
+
+message CustomerListResponse {
+  repeated CustomerResponse customers = 1;
+  int32 total = 2;
+}

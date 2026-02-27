@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package telco.billing.v1;
+
+service BillingService {
+  rpc GetInvoiceDetail(GetInvoiceRequest) returns (InvoiceResponse);
+  rpc GetCustomerInvoices(GetCustomerInvoicesRequest) returns (InvoiceListResponse);
+  rpc DetectAnomaly(DetectAnomalyRequest) returns (AnomalyResponse);
+}
+
+message GetInvoiceRequest {
+  string invoice_id = 1;
+}
+
+message GetCustomerInvoicesRequest {
+  string customer_id = 1;
+  int32 limit = 2;
+}
+
+message InvoiceResponse {
+  string id = 1;
+  string customer_id = 2;
+  string period = 3;       // "2026-02"
+  string amount = 4;
+  string currency = 5;
+  string status = 6;
+  repeated LineItem line_items = 7;
+}
+
+message LineItem {
+  string description = 1;
+  string amount = 2;
+}
+
+message InvoiceListResponse {
+  repeated InvoiceResponse invoices = 1;
+}
+
+message DetectAnomalyRequest {
+  string customer_id = 1;
+  string invoice_id = 2;
+}
+
+message AnomalyResponse {
+  bool has_anomaly = 1;
+  string anomaly_type = 2;    // "overcharge" | "duplicate" | "unexpected_charge"
+  string description = 3;
+  string expected_amount = 4;
+  string actual_amount = 5;
+}

@@ -1,0 +1,25 @@
+# ============================================================
+# Prometheus Configuration — TelcoAgent Platform
+# ============================================================
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # Domain services (will be added as services come online)
+  # - job_name: "customer-service"
+  #   static_configs:
+  #     - targets: ["customer-service:8000"]
+
+  # - job_name: "billing-service"
+  #   static_configs:
+  #     - targets: ["billing-service:8000"]
+
+  # - job_name: "agent-orchestrator"
+  #   static_configs:
+  #     - targets: ["agent-orchestrator:8000"]
