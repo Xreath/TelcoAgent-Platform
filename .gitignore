@@ -51,3 +51,9 @@ htmlcov/
 *.key
 credentials.json
 secrets.yaml
+
+# Planning / personal notes (not for public repo)
+task_plan.md
+findings.md
+progress.md
+TelcoAgent_Platform_Project_Plan.md
