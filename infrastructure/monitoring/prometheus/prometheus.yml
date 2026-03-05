@@ -11,15 +11,17 @@ scrape_configs:
     static_configs:
       - targets: ["localhost:9090"]
 
-  # Domain services (will be added as services come online)
-  # - job_name: "customer-service"
-  #   static_configs:
-  #     - targets: ["customer-service:8000"]
+  # Domain services
+  - job_name: "customer-service"
+    static_configs:
+      - targets: ["customer-service:8001"]
 
-  # - job_name: "billing-service"
-  #   static_configs:
-  #     - targets: ["billing-service:8000"]
+  - job_name: "billing-service"
+    static_configs:
+      - targets: ["billing-service:8002"]
 
-  # - job_name: "agent-orchestrator"
-  #   static_configs:
-  #     - targets: ["agent-orchestrator:8000"]
+  # Agent services
+  - job_name: "customer-support-agent"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: ["customer-support-agent:8010"]

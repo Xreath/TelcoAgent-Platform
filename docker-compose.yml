@@ -192,6 +192,38 @@ services:
     networks:
       - telco-net
 
+  # ── Customer Support Agent ─────────────────────────────────
+  customer-support-agent:
+    build:
+      context: .
+      dockerfile: agents/customer_support/Dockerfile
+    container_name: telco-customer-support-agent
+    environment:
+      POSTGRES_HOST: postgres
+      REDIS_HOST: redis
+      MONGO_HOST: mongodb
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      OPENAI_API_BASE: ${OPENAI_API_BASE:-https://api.deepseek.com/v1}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-your-deepseek-api-key}
+      LANGCHAIN_TRACING_V2: "true"
+      LANGCHAIN_API_KEY: ${LANGCHAIN_API_KEY:-your-langsmith-key}
+      LANGCHAIN_PROJECT: telco-agent-platform
+    ports:
+      - "8010:8010"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.agent.rule=PathPrefix(`/v1/agent`)"
+      - "traefik.http.services.agent.loadbalancer.server.port=8010"
+    networks:
+      - telco-net
+
   # ── Traefik (API Gateway — Week 1-6) ──────────────────────
   traefik:
     image: traefik:v3.2
