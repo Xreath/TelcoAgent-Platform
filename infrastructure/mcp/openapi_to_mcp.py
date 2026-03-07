@@ -21,7 +21,6 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
-import sys
 from pathlib import Path
 from typing import Any
 
@@ -51,7 +50,6 @@ class OpenAPItoMCPGenerator:
     def generate(self, spec: dict[str, Any]) -> str:
         """Generate MCP server code from an OpenAPI spec dict."""
         title = spec.get("info", {}).get("title", "Service")
-        description = spec.get("info", {}).get("description", "")
         paths = spec.get("paths", {})
 
         lines = [
@@ -67,7 +65,7 @@ class OpenAPItoMCPGenerator:
             "",
             f'mcp = FastMCP("{title} MCP Server")',
             "",
-            f"BASE_URL = \"http://localhost:8000\"  # Update with actual service URL",
+            'BASE_URL = "http://localhost:8000"  # Update with actual service URL',
             "",
         ]
 
@@ -78,12 +76,14 @@ class OpenAPItoMCPGenerator:
                 tool_code = self._generate_tool(path, method.upper(), operation)
                 lines.append(tool_code)
 
-        lines.extend([
-            "",
-            'if __name__ == "__main__":',
-            '    mcp.run(transport="stdio")',
-            "",
-        ])
+        lines.extend(
+            [
+                "",
+                'if __name__ == "__main__":',
+                '    mcp.run(transport="stdio")',
+                "",
+            ]
+        )
 
         return "\n".join(lines)
 
@@ -109,31 +109,27 @@ class OpenAPItoMCPGenerator:
         sig_parts = []
         for p in path_params:
             ptype = self._schema_to_type(p.get("schema", {}))
-            sig_parts.append(
-                f'    {p["name"]}: Annotated[{ptype}, "{p.get("description", p["name"])}"],'
-            )
+            sig_parts.append(f'    {p["name"]}: Annotated[{ptype}, "{p.get("description", p["name"])}"],')
         for p in query_params:
             ptype = self._schema_to_type(p.get("schema", {}))
             default = p.get("schema", {}).get("default")
             default_str = f" = {repr(default)}" if default is not None else ""
-            sig_parts.append(
-                f'    {p["name"]}: Annotated[{ptype}, "{p.get("description", p["name"])}"]{default_str},'
-            )
+            sig_parts.append(f'    {p["name"]}: Annotated[{ptype}, "{p.get("description", p["name"])}"]{default_str},')
         if body_schema:
             for prop_name, prop_info in body_schema.get("properties", {}).items():
                 ptype = self._schema_to_type(prop_info)
                 required = prop_name in body_schema.get("required", [])
                 default_str = "" if required else " = None"
                 desc = prop_info.get("description", prop_name)
-                sig_parts.append(
-                    f'    {prop_name}: Annotated[{ptype}, "{desc}"]{default_str},'
-                )
+                sig_parts.append(f'    {prop_name}: Annotated[{ptype}, "{desc}"]{default_str},')
 
         sig = "\n".join(sig_parts) if sig_parts else ""
 
         # Build URL with path params
-        url_expr = f'f"{{BASE_URL}}{path}"' if "{" in path else f'"{{BASE_URL}}{path}"'
-        url_expr = url_expr.replace("BASE_URL", "BASE_URL")
+        if "{" in path:
+            url_expr = 'f"{BASE_URL}' + path + '"'
+        else:
+            url_expr = 'f"{BASE_URL}' + path + '"'
 
         # Build the tool function
         lines = [
@@ -143,7 +139,7 @@ class OpenAPItoMCPGenerator:
             sig,
             ") -> str:",
             f'    """{description}"""',
-            f"    async with httpx.AsyncClient(timeout=10.0) as client:",
+            "    async with httpx.AsyncClient(timeout=10.0) as client:",
         ]
 
         if method == "GET":
@@ -160,16 +156,19 @@ class OpenAPItoMCPGenerator:
         elif method == "DELETE":
             lines.append(f"        resp = await client.delete({url_expr})")
 
-        lines.extend([
-            "        resp.raise_for_status()",
-            "        return json.dumps(resp.json(), indent=2, ensure_ascii=False)",
-        ])
+        lines.extend(
+            [
+                "        resp.raise_for_status()",
+                "        return json.dumps(resp.json(), indent=2, ensure_ascii=False)",
+            ]
+        )
 
         return "\n".join(lines)
 
     def _to_func_name(self, text: str) -> str:
         """Convert operationId or path to a valid Python function name."""
         import re
+
         # Remove path separators and braces
         name = text.strip("/").replace("/", "_").replace("{", "").replace("}", "")
         name = re.sub(r"[^a-zA-Z0-9_]", "_", name)

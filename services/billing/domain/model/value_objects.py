@@ -1,12 +1,12 @@
 """Billing Domain — Value Objects."""
 
 from decimal import Decimal
-from enum import Enum
+from enum import StrEnum
 
 from shared.models.base import ValueObject
 
 
-class Currency(str, Enum):
+class Currency(StrEnum):
     TRY = "TRY"
     USD = "USD"
     EUR = "EUR"
@@ -14,6 +14,7 @@ class Currency(str, Enum):
 
 class Money(ValueObject):
     """Monetary amount with currency — immutable."""
+
     amount: Decimal
     currency: Currency = Currency.TRY
 
@@ -26,7 +27,7 @@ class Money(ValueObject):
         return f"{self.amount:.2f} {self.currency.value}"
 
 
-class InvoiceStatus(str, Enum):
+class InvoiceStatus(StrEnum):
     DRAFT = "draft"
     ISSUED = "issued"
     PAID = "paid"
@@ -35,7 +36,7 @@ class InvoiceStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
-class DisputeStatus(str, Enum):
+class DisputeStatus(StrEnum):
     OPEN = "open"
     UNDER_REVIEW = "under_review"
     RESOLVED = "resolved"
@@ -44,6 +45,7 @@ class DisputeStatus(str, Enum):
 
 class BillingPeriod(ValueObject):
     """Billing period — month/year combination."""
+
     year: int
     month: int  # 1-12
 

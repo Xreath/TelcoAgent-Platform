@@ -61,6 +61,7 @@ class CustomerCommandHandlers:
     async def handle_file_complaint(self, cmd: FileComplaintCommand) -> None:
         """File a complaint — triggers ComplaintFiled domain event."""
         import uuid
+
         customer = await self._repo.find_by_id(uuid.UUID(cmd.customer_id))
         if not customer:
             raise ValueError(f"Customer {cmd.customer_id} not found")
@@ -79,6 +80,7 @@ class CustomerCommandHandlers:
     async def handle_change_segment(self, cmd: ChangeSegmentCommand) -> None:
         """Change customer segment — triggers SegmentChanged domain event."""
         import uuid
+
         customer = await self._repo.find_by_id(uuid.UUID(cmd.customer_id))
         if not customer:
             raise ValueError(f"Customer {cmd.customer_id} not found")

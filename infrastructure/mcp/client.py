@@ -15,8 +15,9 @@ Usage:
 from __future__ import annotations
 
 import asyncio
-import json
+import inspect
 import logging
+import typing
 from typing import Any
 
 from langchain_core.tools import StructuredTool
@@ -56,16 +57,15 @@ class MCPToolClient:
                 self._tools.extend(tools)
                 logger.info(
                     "Discovered %d tools from MCP server '%s'",
-                    len(tools), server_name,
+                    len(tools),
+                    server_name,
                 )
             except Exception:
                 logger.exception("Failed to discover tools from '%s'", server_name)
 
         return self._tools
 
-    async def _discover_from_module(
-        self, server_name: str, module_path: str
-    ) -> list[StructuredTool]:
+    async def _discover_from_module(self, server_name: str, module_path: str) -> list[StructuredTool]:
         """Import an MCP server module and extract its tools."""
         import importlib
 
@@ -78,33 +78,28 @@ class MCPToolClient:
 
         tools: list[StructuredTool] = []
 
-        # FastMCP stores tools internally — access via _tool_manager
-        tool_manager = getattr(mcp_server, "_tool_manager", None)
-        if tool_manager is None:
-            logger.warning("No tool manager found in MCP server '%s'", server_name)
+        # FastMCP stores tools in _tool_manager.tools (dict of MCPTool)
+        # Try multiple access paths for compatibility across FastMCP versions
+        tool_dict = _extract_tool_dict(mcp_server)
+        if tool_dict is None:
+            logger.warning("Could not extract tools from MCP server '%s'", server_name)
             return []
 
-        for tool_name, tool_info in tool_manager._tools.items():
-            fn = tool_info.fn
-            description = tool_info.description or fn.__doc__ or f"MCP tool: {tool_name}"
+        for tool_name, tool_info in tool_dict.items():
+            fn = tool_info.fn if hasattr(tool_info, "fn") else tool_info
+            description = ""
+            if hasattr(tool_info, "description") and tool_info.description:
+                description = tool_info.description
+            elif fn.__doc__:
+                description = fn.__doc__
+            else:
+                description = f"MCP tool: {tool_name}"
 
             # Build a Pydantic model from the tool's parameters
-            input_schema = _build_input_schema(tool_name, tool_info)
+            input_schema = _build_input_schema(tool_name, fn)
 
-            # Create a wrapper that calls the original MCP tool function
-            async def _invoke(wrapper_fn=fn, **kwargs: Any) -> str:
-                result = wrapper_fn(**kwargs)
-                if asyncio.iscoroutine(result):
-                    result = await result
-                return str(result)
-
-            lc_tool = StructuredTool(
-                name=f"{server_name}_{tool_name}",
-                description=f"[{server_name.upper()}] {description}",
-                func=lambda **kwargs: None,  # sync placeholder
-                coroutine=_invoke,
-                args_schema=input_schema,
-            )
+            # Create a proper closure to avoid late-binding issues
+            lc_tool = _make_langchain_tool(tool_name, description, fn, input_schema)
             tools.append(lc_tool)
 
         return tools
@@ -118,11 +113,61 @@ class MCPToolClient:
         return len(self._tools)
 
 
-def _build_input_schema(tool_name: str, tool_info: Any) -> type[BaseModel]:
-    """Build a Pydantic model from MCP tool parameter info."""
-    import inspect
+def _extract_tool_dict(mcp_server: Any) -> dict[str, Any] | None:
+    """Extract the tool dictionary from a FastMCP server across versions."""
+    # FastMCP >= 2.x: mcp._tool_manager._tools
+    tool_manager = getattr(mcp_server, "_tool_manager", None)
+    if tool_manager is not None:
+        tools_attr = getattr(tool_manager, "_tools", None) or getattr(tool_manager, "tools", None)
+        if tools_attr and isinstance(tools_attr, dict):
+            return tools_attr
 
-    fn = tool_info.fn
+    # FastMCP with _local_provider
+    local_provider = getattr(mcp_server, "_local_provider", None)
+    if local_provider is not None:
+        components = getattr(local_provider, "_components", None)
+        if components and isinstance(components, dict):
+            # Filter for tool components
+            return {k: v for k, v in components.items() if hasattr(v, "fn")}
+
+    # Fallback: try _tools directly
+    direct_tools = getattr(mcp_server, "_tools", None)
+    if direct_tools and isinstance(direct_tools, dict):
+        return direct_tools
+
+    return None
+
+
+def _make_langchain_tool(
+    tool_name: str,
+    description: str,
+    fn: Any,
+    input_schema: type[BaseModel],
+) -> StructuredTool:
+    """Create a LangChain StructuredTool wrapping an MCP tool function.
+
+    Uses a factory function to avoid closure late-binding issues.
+    Tool names are kept as-is (no server prefix) to match agent prompts.
+    """
+    captured_fn = fn
+
+    async def _invoke(**kwargs: Any) -> str:
+        result = captured_fn(**kwargs)
+        if asyncio.iscoroutine(result):
+            result = await result
+        return str(result)
+
+    return StructuredTool(
+        name=tool_name,
+        description=description,
+        func=lambda **_kwargs: None,
+        coroutine=_invoke,
+        args_schema=input_schema,
+    )
+
+
+def _build_input_schema(tool_name: str, fn: Any) -> type[BaseModel]:
+    """Build a Pydantic model from a tool function's signature."""
     sig = inspect.signature(fn)
     fields: dict[str, Any] = {}
 
@@ -131,29 +176,22 @@ def _build_input_schema(tool_name: str, tool_info: Any) -> type[BaseModel]:
             continue
 
         annotation = param.annotation if param.annotation != inspect.Parameter.empty else str
-        # Unwrap Annotated types to get the base type
-        origin = getattr(annotation, "__origin__", None)
-        if origin is not None:
-            # Handle Annotated[str, "description"]
-            import typing
-            if hasattr(typing, "get_args"):
-                args = typing.get_args(annotation)
-                if args:
-                    base_type = args[0]
-                    desc = args[1] if len(args) > 1 and isinstance(args[1], str) else ""
-                else:
-                    base_type = str
-                    desc = ""
-            else:
-                base_type = str
-                desc = ""
+
+        # Unwrap Annotated types
+        origin = typing.get_origin(annotation)
+        if origin is typing.Annotated:
+            args = typing.get_args(annotation)
+            base_type = args[0] if args else str
+            desc = args[1] if len(args) > 1 and isinstance(args[1], str) else ""
         else:
             base_type = annotation
             desc = ""
 
-        # Handle Optional types
-        if hasattr(base_type, "__origin__") and base_type.__origin__ is type(None):
-            base_type = str
+        # Handle Optional (Union[X, None])
+        if typing.get_origin(base_type) is typing.Union:
+            union_args = typing.get_args(base_type)
+            non_none = [a for a in union_args if a is not type(None)]
+            base_type = non_none[0] if non_none else str
 
         default = param.default if param.default != inspect.Parameter.empty else ...
         fields[param_name] = (base_type, Field(default=default, description=desc))

@@ -13,12 +13,13 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import asynccontextmanager
+from typing import Any
 
 import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
-from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from pydantic import BaseModel
 
 from agents.customer_support.agent import CustomerSupportAgentRunner
@@ -69,6 +70,7 @@ app.add_middleware(
 
 # ── Request schemas ───────────────────────────────────────────
 
+
 class ComplaintRequest(BaseModel):
     customer_id: str
     complaint_type: str  # billing | network | service | general
@@ -78,13 +80,14 @@ class ComplaintRequest(BaseModel):
 
 # ── Endpoints ─────────────────────────────────────────────────
 
+
 @app.get("/health")
-async def health() -> dict:
+async def health() -> dict[str, Any]:
     return {"status": "ok", "service": "customer-support-agent"}
 
 
 @app.post("/v1/agent/complaint")
-async def trigger_agent(body: ComplaintRequest) -> dict:
+async def trigger_agent(body: ComplaintRequest) -> dict[str, Any]:
     """Manually trigger the agent for testing — bypasses Kafka."""
     runner = CustomerSupportAgentRunner()
     try:

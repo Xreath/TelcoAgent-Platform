@@ -17,7 +17,6 @@ Results are printed as a comparison table.
 from __future__ import annotations
 
 import asyncio
-import json
 import statistics
 import time
 from dataclasses import dataclass
@@ -50,8 +49,15 @@ async def benchmark_rest(customer_id: str, iterations: int = 50) -> BenchmarkRes
                 await client.get(url)
             except httpx.ConnectError:
                 return BenchmarkResult(
-                    protocol="REST", operation="get_customer", iterations=0,
-                    avg_ms=0, p50_ms=0, p95_ms=0, p99_ms=0, min_ms=0, max_ms=0,
+                    protocol="REST",
+                    operation="get_customer",
+                    iterations=0,
+                    avg_ms=0,
+                    p50_ms=0,
+                    p95_ms=0,
+                    p99_ms=0,
+                    min_ms=0,
+                    max_ms=0,
                 )
 
         for _ in range(iterations):
@@ -69,8 +75,15 @@ async def benchmark_mcp(customer_id: str, iterations: int = 50) -> BenchmarkResu
         from infrastructure.mcp.customer_mcp_server import get_customer_profile
     except ImportError:
         return BenchmarkResult(
-            protocol="MCP", operation="get_customer", iterations=0,
-            avg_ms=0, p50_ms=0, p95_ms=0, p99_ms=0, min_ms=0, max_ms=0,
+            protocol="MCP",
+            operation="get_customer",
+            iterations=0,
+            avg_ms=0,
+            p50_ms=0,
+            p95_ms=0,
+            p99_ms=0,
+            min_ms=0,
+            max_ms=0,
         )
 
     latencies = []
@@ -105,13 +118,18 @@ async def benchmark_grpc(customer_id: str, iterations: int = 50) -> BenchmarkRes
     return result
 
 
-def _compute_result(
-    protocol: str, operation: str, iterations: int, latencies: list[float]
-) -> BenchmarkResult:
+def _compute_result(protocol: str, operation: str, iterations: int, latencies: list[float]) -> BenchmarkResult:
     if not latencies:
         return BenchmarkResult(
-            protocol=protocol, operation=operation, iterations=0,
-            avg_ms=0, p50_ms=0, p95_ms=0, p99_ms=0, min_ms=0, max_ms=0,
+            protocol=protocol,
+            operation=operation,
+            iterations=0,
+            avg_ms=0,
+            p50_ms=0,
+            p95_ms=0,
+            p99_ms=0,
+            min_ms=0,
+            max_ms=0,
         )
 
     sorted_lat = sorted(latencies)

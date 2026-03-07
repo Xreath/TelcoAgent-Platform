@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Annotated
 
 import httpx
@@ -21,8 +21,8 @@ from shared.config.settings import get_settings
 
 settings = get_settings()
 
-CUSTOMER_SERVICE_URL = "http://localhost:8001/v1/customers"
-BILLING_SERVICE_URL = "http://localhost:8002/v1/billing"
+CUSTOMER_SERVICE_URL = settings.customer_service_url
+BILLING_SERVICE_URL = settings.billing_service_url
 
 
 @tool
@@ -42,17 +42,20 @@ async def get_customer_profile(customer_id: Annotated[str, "UUID of the customer
             return f"Error fetching customer {customer_id}: HTTP {e.response.status_code}"
         except httpx.ConnectError:
             # Fallback mock for dev/testing when Customer Service is down
-            return json.dumps({
-                "id": customer_id,
-                "name": "Demo Müşteri",
-                "phone_number": "+905551234567",
-                "email": "demo@telco.com",
-                "segment": "gold",
-                "subscription_plan": "postpaid_premium",
-                "clv_score": 85.0,
-                "is_active": True,
-                "_mock": True,
-            }, indent=2)
+            return json.dumps(
+                {
+                    "id": customer_id,
+                    "name": "Demo Müşteri",
+                    "phone_number": "+905551234567",
+                    "email": "demo@telco.com",
+                    "segment": "gold",
+                    "subscription_plan": "postpaid_premium",
+                    "clv_score": 85.0,
+                    "is_active": True,
+                    "_mock": True,
+                },
+                indent=2,
+            )
 
 
 @tool
@@ -77,24 +80,27 @@ async def get_billing_info(customer_id: Annotated[str, "UUID of the customer"]) 
             return f"Error fetching billing info: HTTP {e.response.status_code}"
         except httpx.ConnectError:
             # Fallback mock
-            return json.dumps([
-                {
-                    "id": str(uuid.uuid4()),
-                    "customer_id": customer_id,
-                    "period": "2026-02",
-                    "amount": "189.90",
-                    "currency": "TRY",
-                    "status": "paid",
-                },
-                {
-                    "id": str(uuid.uuid4()),
-                    "customer_id": customer_id,
-                    "period": "2026-01",
-                    "amount": "245.50",
-                    "currency": "TRY",
-                    "status": "paid",
-                },
-            ], indent=2)
+            return json.dumps(
+                [
+                    {
+                        "id": str(uuid.uuid4()),
+                        "customer_id": customer_id,
+                        "period": "2026-02",
+                        "amount": "189.90",
+                        "currency": "TRY",
+                        "status": "paid",
+                    },
+                    {
+                        "id": str(uuid.uuid4()),
+                        "customer_id": customer_id,
+                        "period": "2026-01",
+                        "amount": "245.50",
+                        "currency": "TRY",
+                        "status": "paid",
+                    },
+                ],
+                indent=2,
+            )
 
 
 @tool
@@ -118,7 +124,7 @@ async def create_ticket(
         "resolution": resolution,
         "priority": priority,
         "status": "resolved",
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
     }
     # In production this would call a Ticket Service or write to DB
     # For now we return the ticket as confirmation
@@ -142,7 +148,7 @@ async def send_notification(
         "channel": channel,
         "message": message,
         "status": "sent",
-        "sent_at": datetime.now(timezone.utc).isoformat(),
+        "sent_at": datetime.now(UTC).isoformat(),
     }
     # In production this would integrate with SMS gateway / email service
     return json.dumps(notification, indent=2, ensure_ascii=False)

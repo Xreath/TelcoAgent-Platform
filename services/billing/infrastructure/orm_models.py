@@ -1,7 +1,7 @@
 """Billing Service — SQLAlchemy ORM models."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 from sqlalchemy import DateTime, Integer, Numeric, String, Text
@@ -23,14 +23,14 @@ class InvoiceORM(Base):
     currency: Mapped[str] = mapped_column(String(10), nullable=False, default="TRY")
     status: Mapped[str] = mapped_column(String(50), nullable=False, default="draft")
     dispute_status: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    line_items: Mapped[dict] = mapped_column(JSONB, nullable=False, default=list)
+    line_items: Mapped[list[dict[str, str]]] = mapped_column(JSONB, nullable=False, default=list)
     due_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc)
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc)
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
     )
 
 
@@ -46,6 +46,6 @@ class DisputeORM(Base):
     resolution: Mapped[str | None] = mapped_column(Text, nullable=True)
     refund_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc)
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
     )
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

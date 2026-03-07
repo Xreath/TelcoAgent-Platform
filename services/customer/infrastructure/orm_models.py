@@ -1,7 +1,7 @@
 """Customer Service — SQLAlchemy ORM models (infrastructure layer)."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import Boolean, DateTime, Float, String, Text
@@ -25,16 +25,16 @@ class CustomerORM(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     # Address stored as JSONB (no separate table — value object)
-    address: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    address: Mapped[dict[str, str] | None] = mapped_column(JSONB, nullable=True)
 
     # pgvector — customer profile embedding (for similarity search)
-    profile_embedding: Mapped[list | None] = mapped_column(Vector(1536), nullable=True)
+    profile_embedding: Mapped[list[float] | None] = mapped_column(Vector(1536), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc)
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc)
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
     )
 
 
@@ -50,6 +50,6 @@ class ComplaintORM(Base):
     status: Mapped[str] = mapped_column(String(50), nullable=False, default="open")  # open, in_progress, resolved
     resolution: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc)
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
     )
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

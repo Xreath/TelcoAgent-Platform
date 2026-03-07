@@ -18,15 +18,18 @@ from typing import Annotated
 import httpx
 from fastmcp import FastMCP
 
+from shared.config.settings import get_settings
+
 mcp = FastMCP(
     "Customer Domain MCP Server",
-    description="Provides customer profile, complaint, and segment tools for AI agents",
+    instructions="Provides customer profile, complaint, and segment tools for AI agents",
 )
 
-CUSTOMER_SERVICE_URL = "http://localhost:8001/v1/customers"
+CUSTOMER_SERVICE_URL = get_settings().customer_service_url
 
 
 # ── Tools ─────────────────────────────────────────────────────
+
 
 @mcp.tool()
 async def get_customer_profile(
@@ -45,11 +48,20 @@ async def get_customer_profile(
         except httpx.HTTPStatusError as e:
             return json.dumps({"error": f"Customer not found: HTTP {e.response.status_code}"})
         except httpx.ConnectError:
-            return json.dumps({
-                "id": customer_id, "name": "Demo Müşteri", "phone_number": "+905551234567",
-                "email": "demo@telco.com", "segment": "gold", "subscription_plan": "postpaid_premium",
-                "clv_score": 85.0, "is_active": True, "_mock": True,
-            }, indent=2)
+            return json.dumps(
+                {
+                    "id": customer_id,
+                    "name": "Demo Müşteri",
+                    "phone_number": "+905551234567",
+                    "email": "demo@telco.com",
+                    "segment": "gold",
+                    "subscription_plan": "postpaid_premium",
+                    "clv_score": 85.0,
+                    "is_active": True,
+                    "_mock": True,
+                },
+                indent=2,
+            )
 
 
 @mcp.tool()
@@ -71,10 +83,13 @@ async def list_customers(
                 customers = [c for c in customers if c.get("segment") == segment]
             return json.dumps(customers, indent=2, ensure_ascii=False)
         except httpx.ConnectError:
-            return json.dumps([
-                {"id": str(uuid.uuid4()), "name": "Mock Müşteri 1", "segment": segment or "gold", "_mock": True},
-                {"id": str(uuid.uuid4()), "name": "Mock Müşteri 2", "segment": segment or "silver", "_mock": True},
-            ], indent=2)
+            return json.dumps(
+                [
+                    {"id": str(uuid.uuid4()), "name": "Mock Müşteri 1", "segment": segment or "gold", "_mock": True},
+                    {"id": str(uuid.uuid4()), "name": "Mock Müşteri 2", "segment": segment or "silver", "_mock": True},
+                ],
+                indent=2,
+            )
 
 
 @mcp.tool()
@@ -93,10 +108,20 @@ async def get_customer_complaints(
         except httpx.HTTPStatusError as e:
             return json.dumps({"error": f"HTTP {e.response.status_code}"})
         except httpx.ConnectError:
-            return json.dumps([
-                {"id": str(uuid.uuid4()), "customer_id": customer_id, "complaint_type": "billing",
-                 "description": "Faturada fazla ücret", "priority": "high", "status": "open", "_mock": True},
-            ], indent=2)
+            return json.dumps(
+                [
+                    {
+                        "id": str(uuid.uuid4()),
+                        "customer_id": customer_id,
+                        "complaint_type": "billing",
+                        "description": "Faturada fazla ücret",
+                        "priority": "high",
+                        "status": "open",
+                        "_mock": True,
+                    },
+                ],
+                indent=2,
+            )
 
 
 @mcp.tool()
@@ -125,12 +150,15 @@ async def file_complaint(
         except httpx.HTTPStatusError as e:
             return json.dumps({"error": f"HTTP {e.response.status_code}", "detail": e.response.text})
         except httpx.ConnectError:
-            return json.dumps({
-                "status": "complaint filed (mock)",
-                "customer_id": customer_id,
-                "complaint_type": complaint_type,
-                "_mock": True,
-            }, indent=2)
+            return json.dumps(
+                {
+                    "status": "complaint filed (mock)",
+                    "customer_id": customer_id,
+                    "complaint_type": complaint_type,
+                    "_mock": True,
+                },
+                indent=2,
+            )
 
 
 @mcp.tool()
@@ -159,27 +187,36 @@ async def change_customer_segment(
 
 # ── Resources ─────────────────────────────────────────────────
 
+
 @mcp.resource("customer://segments")
 def get_segments() -> str:
     """Available customer segments and their descriptions."""
-    return json.dumps({
-        "new": "Yeni kayıt olmuş müşteri, henüz sınıflandırılmamış",
-        "bronze": "Düşük CLV, prepaid, minimal kullanım",
-        "silver": "Orta CLV, aktif kullanıcı",
-        "gold": "Yüksek CLV, sadık müşteri, öncelikli destek",
-        "platinum": "En yüksek CLV, VIP, özel müşteri temsilcisi",
-    }, indent=2, ensure_ascii=False)
+    return json.dumps(
+        {
+            "new": "Yeni kayıt olmuş müşteri, henüz sınıflandırılmamış",
+            "bronze": "Düşük CLV, prepaid, minimal kullanım",
+            "silver": "Orta CLV, aktif kullanıcı",
+            "gold": "Yüksek CLV, sadık müşteri, öncelikli destek",
+            "platinum": "En yüksek CLV, VIP, özel müşteri temsilcisi",
+        },
+        indent=2,
+        ensure_ascii=False,
+    )
 
 
 @mcp.resource("customer://complaint-types")
 def get_complaint_types() -> str:
     """Available complaint types and their descriptions."""
-    return json.dumps({
-        "billing": "Fatura, ödeme, ücretlendirme sorunları",
-        "network": "Ağ bağlantısı, sinyal, hız sorunları",
-        "service": "Hizmet kalitesi, müşteri hizmetleri sorunları",
-        "general": "Genel şikayet ve geri bildirimler",
-    }, indent=2, ensure_ascii=False)
+    return json.dumps(
+        {
+            "billing": "Fatura, ödeme, ücretlendirme sorunları",
+            "network": "Ağ bağlantısı, sinyal, hız sorunları",
+            "service": "Hizmet kalitesi, müşteri hizmetleri sorunları",
+            "general": "Genel şikayet ve geri bildirimler",
+        },
+        indent=2,
+        ensure_ascii=False,
+    )
 
 
 # ── Entry point ───────────────────────────────────────────────

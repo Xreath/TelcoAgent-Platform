@@ -10,9 +10,8 @@ This guarantees atomicity — no event is lost even if the service crashes.
 
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.events.base import DomainEvent
@@ -27,6 +26,7 @@ class OutboxRepository:
 
     async def save(self, event: DomainEvent) -> None:
         from sqlalchemy import text
+
         await self._session.execute(
             text("""
                 INSERT INTO outbox.events
@@ -42,6 +42,7 @@ class OutboxRepository:
                 "payload": json.dumps(event.model_dump(), default=str),
             },
         )
+        await self._session.flush()
 
 
 class OutboxPoller:
@@ -101,7 +102,7 @@ class OutboxPoller:
                             SET published = TRUE, published_at = :now
                             WHERE id = :id
                         """),
-                        {"id": event_id, "now": datetime.now(timezone.utc)},
+                        {"id": event_id, "now": datetime.now(UTC)},
                     )
                     published_count += 1
 

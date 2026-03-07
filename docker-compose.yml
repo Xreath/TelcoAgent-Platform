@@ -76,23 +76,44 @@ services:
     networks:
       - telco-net
 
-  # ── Kafka (KRaft — no Zookeeper) ───────────────────────────
+  # ── ZooKeeper ───────────────────────────────────────────────
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.7.1
+    container_name: telco-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_logs:/var/lib/zookeeper/log
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo ruok | nc localhost 2181"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - telco-net
+
+  # ── Kafka (ZooKeeper mode) ──────────────────────────────────
   kafka:
     image: confluentinc/cp-kafka:7.7.1
     container_name: telco-kafka
+    depends_on:
+      zookeeper:
+        condition: service_healthy
     environment:
-      KAFKA_NODE_ID: 1
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,HOST:PLAINTEXT
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,HOST:PLAINTEXT
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,HOST://localhost:9092
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,CONTROLLER://0.0.0.0:29093,HOST://0.0.0.0:9092
-      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
-      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,HOST://0.0.0.0:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      CLUSTER_ID: "TelcoAgentKafkaCluster01"
     ports:
       - "9092:9092"
     volumes:
@@ -102,6 +123,52 @@ services:
       interval: 10s
       timeout: 10s
       retries: 10
+    networks:
+      - telco-net
+
+  # ── Customer Service ───────────────────────────────────────
+  customer-service:
+    build:
+      context: .
+      dockerfile: services/customer/Dockerfile
+    container_name: telco-customer-service
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: telco
+      POSTGRES_PASSWORD: telco_secret
+      POSTGRES_DB: telcoagent
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    ports:
+      - "8001:8001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - telco-net
+
+  # ── Billing Service ────────────────────────────────────────
+  billing-service:
+    build:
+      context: .
+      dockerfile: services/billing/Dockerfile
+    container_name: telco-billing-service
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: telco
+      POSTGRES_PASSWORD: telco_secret
+      POSTGRES_DB: telcoagent
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    ports:
+      - "8002:8002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
     networks:
       - telco-net
 
@@ -203,6 +270,8 @@ services:
       REDIS_HOST: redis
       MONGO_HOST: mongodb
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      CUSTOMER_SERVICE_URL: http://customer-service:8001/v1/customers
+      BILLING_SERVICE_URL: http://billing-service:8002/v1/billing
       OPENAI_API_BASE: ${OPENAI_API_BASE:-https://api.deepseek.com/v1}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-your-deepseek-api-key}
       LANGCHAIN_TRACING_V2: "true"
@@ -217,6 +286,10 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
+      customer-service:
+        condition: service_started
+      billing-service:
+        condition: service_started
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.agent.rule=PathPrefix(`/v1/agent`)"
@@ -302,6 +375,8 @@ volumes:
   redis_data:
   mongo_data:
   qdrant_data:
+  zookeeper_data:
+  zookeeper_logs:
   kafka_data:
   prometheus_data:
   grafana_data:

@@ -11,21 +11,24 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Annotated
 
 import httpx
 from fastmcp import FastMCP
 
+from shared.config.settings import get_settings
+
 mcp = FastMCP(
     "Billing Domain MCP Server",
-    description="Provides invoice, payment, and dispute tools for AI agents",
+    instructions="Provides invoice, payment, and dispute tools for AI agents",
 )
 
-BILLING_SERVICE_URL = "http://localhost:8002/v1/billing"
+BILLING_SERVICE_URL = get_settings().billing_service_url
 
 
 # ── Tools ─────────────────────────────────────────────────────
+
 
 @mcp.tool()
 async def get_invoices(
@@ -47,12 +50,29 @@ async def get_invoices(
         except httpx.HTTPStatusError as e:
             return json.dumps({"error": f"HTTP {e.response.status_code}"})
         except httpx.ConnectError:
-            return json.dumps([
-                {"id": str(uuid.uuid4()), "customer_id": customer_id, "period": "2026-02",
-                 "amount": "189.90", "currency": "TRY", "status": "paid", "_mock": True},
-                {"id": str(uuid.uuid4()), "customer_id": customer_id, "period": "2026-01",
-                 "amount": "245.50", "currency": "TRY", "status": "paid", "_mock": True},
-            ], indent=2)
+            return json.dumps(
+                [
+                    {
+                        "id": str(uuid.uuid4()),
+                        "customer_id": customer_id,
+                        "period": "2026-02",
+                        "amount": "189.90",
+                        "currency": "TRY",
+                        "status": "paid",
+                        "_mock": True,
+                    },
+                    {
+                        "id": str(uuid.uuid4()),
+                        "customer_id": customer_id,
+                        "period": "2026-01",
+                        "amount": "245.50",
+                        "currency": "TRY",
+                        "status": "paid",
+                        "_mock": True,
+                    },
+                ],
+                indent=2,
+            )
 
 
 @mcp.tool()
@@ -65,22 +85,26 @@ async def get_invoice_detail(
     """
     # In production, this would call a specific endpoint
     # For now, return a detailed mock
-    return json.dumps({
-        "id": invoice_id,
-        "period": "2026-02",
-        "amount": "189.90",
-        "currency": "TRY",
-        "status": "paid",
-        "line_items": [
-            {"description": "Ses Paketi - Postpaid Premium", "amount": "99.90"},
-            {"description": "Data Paketi - 50GB", "amount": "49.90"},
-            {"description": "Ek Kullanım - Uluslararası Arama", "amount": "25.10"},
-            {"description": "Dijital Servisler", "amount": "15.00"},
-        ],
-        "payment_date": "2026-02-15",
-        "due_date": "2026-02-28",
-        "_mock": True,
-    }, indent=2, ensure_ascii=False)
+    return json.dumps(
+        {
+            "id": invoice_id,
+            "period": "2026-02",
+            "amount": "189.90",
+            "currency": "TRY",
+            "status": "paid",
+            "line_items": [
+                {"description": "Ses Paketi - Postpaid Premium", "amount": "99.90"},
+                {"description": "Data Paketi - 50GB", "amount": "49.90"},
+                {"description": "Ek Kullanım - Uluslararası Arama", "amount": "25.10"},
+                {"description": "Dijital Servisler", "amount": "15.00"},
+            ],
+            "payment_date": "2026-02-15",
+            "due_date": "2026-02-28",
+            "_mock": True,
+        },
+        indent=2,
+        ensure_ascii=False,
+    )
 
 
 @mcp.tool()
@@ -104,14 +128,18 @@ async def open_dispute(
         except httpx.HTTPStatusError as e:
             return json.dumps({"error": f"HTTP {e.response.status_code}", "detail": e.response.text})
         except httpx.ConnectError:
-            return json.dumps({
-                "id": str(uuid.uuid4()),
-                "invoice_id": invoice_id,
-                "reason": reason,
-                "status": "open",
-                "created_at": datetime.now(timezone.utc).isoformat(),
-                "_mock": True,
-            }, indent=2, ensure_ascii=False)
+            return json.dumps(
+                {
+                    "id": str(uuid.uuid4()),
+                    "invoice_id": invoice_id,
+                    "reason": reason,
+                    "status": "open",
+                    "created_at": datetime.now(UTC).isoformat(),
+                    "_mock": True,
+                },
+                indent=2,
+                ensure_ascii=False,
+            )
 
 
 @mcp.tool()
@@ -160,8 +188,7 @@ async def calculate_billing_anomaly(
 
     if result["anomaly_detected"]:
         result["recommendation"] = (
-            "Faturada anormal artış tespit edildi. "
-            "Müşteriye bilgi verilmesi ve detaylı inceleme önerilir."
+            "Faturada anormal artış tespit edildi. Müşteriye bilgi verilmesi ve detaylı inceleme önerilir."
         )
 
     return json.dumps(result, indent=2, ensure_ascii=False)
@@ -196,25 +223,36 @@ async def create_invoice(
         except httpx.HTTPStatusError as e:
             return json.dumps({"error": f"HTTP {e.response.status_code}", "detail": e.response.text})
         except httpx.ConnectError:
-            return json.dumps({
-                "id": str(uuid.uuid4()), "customer_id": customer_id,
-                "status": "pending", "amount": str(amount), "_mock": True,
-            }, indent=2)
+            return json.dumps(
+                {
+                    "id": str(uuid.uuid4()),
+                    "customer_id": customer_id,
+                    "status": "pending",
+                    "amount": str(amount),
+                    "_mock": True,
+                },
+                indent=2,
+            )
 
 
 # ── Resources ─────────────────────────────────────────────────
 
+
 @mcp.resource("billing://invoice-statuses")
 def get_invoice_statuses() -> str:
     """Available invoice statuses and their meanings."""
-    return json.dumps({
-        "pending": "Fatura oluşturuldu, ödeme bekleniyor",
-        "paid": "Ödeme alındı",
-        "overdue": "Ödeme süresi geçti",
-        "disputed": "İtiraz açıldı, incelemede",
-        "cancelled": "Fatura iptal edildi",
-        "refunded": "İade yapıldı",
-    }, indent=2, ensure_ascii=False)
+    return json.dumps(
+        {
+            "pending": "Fatura oluşturuldu, ödeme bekleniyor",
+            "paid": "Ödeme alındı",
+            "overdue": "Ödeme süresi geçti",
+            "disputed": "İtiraz açıldı, incelemede",
+            "cancelled": "Fatura iptal edildi",
+            "refunded": "İade yapıldı",
+        },
+        indent=2,
+        ensure_ascii=False,
+    )
 
 
 @mcp.resource("billing://currencies")

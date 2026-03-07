@@ -69,6 +69,9 @@ dev = [
     "pre-commit>=4.0.0",
 ]
 
+[tool.hatch.build.targets.wheel]
+packages = ["services", "agents", "shared"]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
@@ -87,3 +90,5 @@ asyncio_mode = "auto"
 [tool.mypy]
 python_version = "3.11"
 strict = true
+explicit_package_bases = true
+mypy_path = "."

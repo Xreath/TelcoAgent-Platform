@@ -1,6 +1,7 @@
 """Customer Service — FastAPI REST endpoints (v1)."""
 
-from typing import Annotated
+from typing import Annotated, Any
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -12,12 +13,13 @@ from services.customer.application.commands.handlers import (
     FileComplaintCommand,
     RegisterCustomerCommand,
 )
-from services.customer.application.queries.handlers import CustomerDTO, CustomerQueryHandlers
+from services.customer.application.queries.handlers import ComplaintDTO, CustomerDTO, CustomerQueryHandlers
 from shared.utils.database import get_db_session
 
 router = APIRouter(prefix="/v1/customers", tags=["customers"])
 
 # ── Request / Response schemas ─────────────────────────────
+
 
 class RegisterCustomerRequest(BaseModel):
     name: str
@@ -38,6 +40,7 @@ class ChangeSegmentRequest(BaseModel):
 
 
 # ── Endpoints ──────────────────────────────────────────────
+
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
 async def register_customer(
@@ -79,12 +82,12 @@ async def list_customers(
 
 @router.get("/{customer_id}")
 async def get_customer(
-    customer_id: str,
+    customer_id: UUID,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> CustomerDTO:
     """Get a single customer by ID."""
     handlers = CustomerQueryHandlers(session)
-    customer = await handlers.get_customer(customer_id)
+    customer = await handlers.get_customer(str(customer_id))
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
     return customer
@@ -92,16 +95,16 @@ async def get_customer(
 
 @router.post("/{customer_id}/complaints", status_code=status.HTTP_201_CREATED)
 async def file_complaint(
-    customer_id: str,
+    customer_id: UUID,
     body: FileComplaintRequest,
     session: Annotated[AsyncSession, Depends(get_db_session)],
-) -> dict:
+) -> dict[str, Any]:
     """File a complaint — triggers CustomerSupportAgent via Kafka."""
     handlers = CustomerCommandHandlers(session)
     try:
         await handlers.handle_file_complaint(
             FileComplaintCommand(
-                customer_id=customer_id,
+                customer_id=str(customer_id),
                 complaint_type=body.complaint_type,
                 description=body.description,
                 priority=body.priority,
@@ -109,35 +112,35 @@ async def file_complaint(
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    return {"status": "complaint filed", "customer_id": customer_id}
+    return {"status": "complaint filed", "customer_id": str(customer_id)}
 
 
 @router.get("/{customer_id}/complaints")
 async def get_complaints(
-    customer_id: str,
+    customer_id: UUID,
     session: Annotated[AsyncSession, Depends(get_db_session)],
-):
+) -> list[ComplaintDTO]:
     """List all complaints for a customer."""
     handlers = CustomerQueryHandlers(session)
-    return await handlers.get_complaints(customer_id)
+    return await handlers.get_complaints(str(customer_id))
 
 
 @router.patch("/{customer_id}/segment")
 async def change_segment(
-    customer_id: str,
+    customer_id: UUID,
     body: ChangeSegmentRequest,
     session: Annotated[AsyncSession, Depends(get_db_session)],
-) -> dict:
+) -> dict[str, Any]:
     """Change customer segment (gold, silver, etc.)."""
     handlers = CustomerCommandHandlers(session)
     try:
         await handlers.handle_change_segment(
             ChangeSegmentCommand(
-                customer_id=customer_id,
+                customer_id=str(customer_id),
                 new_segment=body.new_segment,
                 reason=body.reason,
             )
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    return {"status": "segment updated", "customer_id": customer_id}
+    return {"status": "segment updated", "customer_id": str(customer_id)}

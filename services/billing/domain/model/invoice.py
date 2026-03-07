@@ -1,9 +1,9 @@
 """Billing Domain — Invoice Aggregate Root."""
 
-from datetime import datetime, timezone
-from decimal import Decimal
+from datetime import UTC, datetime
 
-from shared.models.base import AggregateRoot
+from pydantic import Field
+
 from services.billing.domain.model.events import (
     BillingAnomalyFound,
     DisputeOpened,
@@ -13,11 +13,11 @@ from services.billing.domain.model.events import (
 )
 from services.billing.domain.model.value_objects import (
     BillingPeriod,
-    Currency,
     DisputeStatus,
     InvoiceStatus,
     Money,
 )
+from shared.models.base import AggregateRoot
 
 
 class Invoice(AggregateRoot):
@@ -30,7 +30,7 @@ class Invoice(AggregateRoot):
     due_date: datetime | None = None
     paid_at: datetime | None = None
     dispute_status: DisputeStatus | None = None
-    line_items: list[dict] = []   # list of {description, amount}
+    line_items: list[dict[str, str]] = Field(default_factory=list)
 
     @classmethod
     def create(
@@ -38,7 +38,7 @@ class Invoice(AggregateRoot):
         customer_id: str,
         period: BillingPeriod,
         amount: Money,
-        line_items: list[dict] | None = None,
+        line_items: list[dict[str, str]] | None = None,
     ) -> "Invoice":
         invoice = cls(
             customer_id=customer_id,
@@ -62,8 +62,8 @@ class Invoice(AggregateRoot):
         if self.status not in (InvoiceStatus.ISSUED, InvoiceStatus.OVERDUE):
             raise ValueError(f"Cannot pay invoice in status: {self.status}")
         self.status = InvoiceStatus.PAID
-        self.paid_at = datetime.now(timezone.utc)
-        self.updated_at = datetime.now(timezone.utc)
+        self.paid_at = datetime.now(UTC)
+        self.updated_at = datetime.now(UTC)
         self.add_event(
             InvoicePaid(
                 aggregate_id=str(self.id),
@@ -90,7 +90,7 @@ class Invoice(AggregateRoot):
             raise ValueError("Dispute already open")
         self.dispute_status = DisputeStatus.OPEN
         self.status = InvoiceStatus.DISPUTED
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(UTC)
         self.add_event(
             DisputeOpened(
                 aggregate_id=str(self.id),
@@ -105,7 +105,7 @@ class Invoice(AggregateRoot):
             raise ValueError("No open dispute to resolve")
         self.dispute_status = DisputeStatus.RESOLVED
         self.status = InvoiceStatus.PAID if refund_amount else InvoiceStatus.ISSUED
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(UTC)
         self.add_event(
             DisputeResolved(
                 aggregate_id=str(self.id),

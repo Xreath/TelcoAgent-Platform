@@ -24,7 +24,7 @@ class BillingAnomalyFound(DomainEvent):
     event_type: str = "billing.anomaly_found"
     aggregate_type: str = "Invoice"
     customer_id: str
-    anomaly_type: str       # "overcharge" | "duplicate" | "unexpected_charge"
+    anomaly_type: str  # "overcharge" | "duplicate" | "unexpected_charge"
     expected_amount: str
     actual_amount: str
     description: str

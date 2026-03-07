@@ -20,6 +20,7 @@ Flow:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import uuid
@@ -113,10 +114,12 @@ class CustomerSupportAgentRunner:
 
         if self._use_mcp:
             from infrastructure.mcp.client import MCPToolClient
+
             client = MCPToolClient()
             mcp_tools = await client.discover_tools()
             # Combine MCP tools with static tools (create_ticket, send_notification)
             from agents.customer_support.tools import create_ticket, send_notification
+
             all_tools = mcp_tools + [create_ticket, send_notification]
             self._agent = create_customer_support_agent(tools=all_tools)
             logger.info("Agent initialized with %d MCP tools + 2 static tools", len(mcp_tools))
@@ -160,22 +163,36 @@ class CustomerSupportAgentRunner:
         # Save to memory
         await self._memory.add_message(session_id, "user", complaint_message)
 
-        # Run agent with metrics tracking
+        # Run agent with metrics tracking and timeout
         with self._metrics.track_invocation(complaint_type, priority):
-            result = await self._agent.ainvoke(
-                {"messages": [HumanMessage(content=complaint_message)]},
-                config={"configurable": {"thread_id": session_id}},
-            )
+            try:
+                async with asyncio.timeout(300):  # 5 minute timeout
+                    result = await self._agent.ainvoke(
+                        {"messages": [HumanMessage(content=complaint_message)]},
+                        config={"configurable": {"thread_id": session_id}},
+                    )
+            except TimeoutError:
+                self._metrics.track_error("timeout")
+                return {
+                    "session_id": session_id,
+                    "customer_id": customer_id,
+                    "complaint_type": complaint_type,
+                    "priority": priority,
+                    "response": "Agent zaman asimina ugradi. Lutfen tekrar deneyin.",
+                    "message_count": 0,
+                }
 
         # Extract final response
         messages = result.get("messages", [])
         final_message = messages[-1].content if messages else "No response generated"
 
-        # Track tool calls
+        # Track tool calls (including errors from ToolMessages)
         for msg in messages:
             if hasattr(msg, "tool_calls") and msg.tool_calls:
                 for tc in msg.tool_calls:
                     self._metrics.track_tool_call(tc["name"])
+            if msg.type == "tool" and hasattr(msg, "status") and msg.status == "error":
+                self._metrics.track_error(f"tool_{msg.name}")
 
         # Save response to memory
         await self._memory.add_message(session_id, "assistant", final_message)

@@ -67,6 +67,10 @@ class Settings(BaseSettings):
     langchain_api_key: str = "your-langsmith-key"
     langchain_project: str = "telco-agent-platform"
 
+    # Service URLs
+    customer_service_url: str = "http://localhost:8001/v1/customers"
+    billing_service_url: str = "http://localhost:8002/v1/billing"
+
     # Observability
     jaeger_endpoint: str = "http://localhost:14268/api/traces"
 

@@ -1,11 +1,11 @@
 """Customer Domain — Value Objects."""
 
-from enum import Enum
+from enum import StrEnum
 
 from shared.models.base import ValueObject
 
 
-class CustomerSegment(str, Enum):
+class CustomerSegment(StrEnum):
     """Customer segmentation based on CLV and behavior."""
 
     PLATINUM = "platinum"
@@ -39,7 +39,7 @@ class Address(ValueObject):
     full_address: str
 
 
-class SubscriptionPlan(str, Enum):
+class SubscriptionPlan(StrEnum):
     """Telecom subscription plans."""
 
     PREPAID_BASIC = "prepaid_basic"

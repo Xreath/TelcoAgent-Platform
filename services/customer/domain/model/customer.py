@@ -1,8 +1,7 @@
 """Customer Domain — Aggregate Root."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from shared.models.base import AggregateRoot
 from services.customer.domain.model.events import (
     ComplaintFiled,
     CustomerCreated,
@@ -14,6 +13,7 @@ from services.customer.domain.model.value_objects import (
     PhoneNumber,
     SubscriptionPlan,
 )
+from shared.models.base import AggregateRoot
 
 
 class Customer(AggregateRoot):
@@ -60,7 +60,7 @@ class Customer(AggregateRoot):
 
         old_segment = self.segment
         self.segment = new_segment
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(UTC)
 
         self.add_event(
             CustomerSegmentChanged(
@@ -90,4 +90,4 @@ class Customer(AggregateRoot):
     def deactivate(self) -> None:
         """Deactivate customer account."""
         self.is_active = False
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(UTC)

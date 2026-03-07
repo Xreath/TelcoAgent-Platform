@@ -1,12 +1,13 @@
 """Customer Service — Concrete PostgreSQL repository implementation."""
 
 import uuid
+from typing import Any
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.customer.domain.model.customer import Customer
-from services.customer.domain.model.value_objects import CustomerSegment, PhoneNumber, SubscriptionPlan
+from services.customer.domain.model.value_objects import Address, CustomerSegment, PhoneNumber, SubscriptionPlan
 from services.customer.domain.repository import CustomerRepository
 from services.customer.infrastructure.orm_models import CustomerORM
 
@@ -23,9 +24,7 @@ class PostgresCustomerRepository(CustomerRepository):
         if existing:
             # Update existing record
             await self._session.execute(
-                update(CustomerORM)
-                .where(CustomerORM.id == customer.id)
-                .values(**self._to_orm_dict(customer))
+                update(CustomerORM).where(CustomerORM.id == customer.id).values(**self._to_orm_dict(customer))
             )
         else:
             # Insert new record
@@ -58,7 +57,7 @@ class PostgresCustomerRepository(CustomerRepository):
 
     # ── Mapping helpers ───────────────────────────────────────
 
-    def _to_orm_dict(self, customer: Customer) -> dict:
+    def _to_orm_dict(self, customer: Customer) -> dict[str, Any]:
         return {
             "name": customer.name,
             "phone_number": customer.phone_number.full_number,
@@ -80,11 +79,14 @@ class PostgresCustomerRepository(CustomerRepository):
         else:
             phone = PhoneNumber(country_code="", number=phone_str)
 
+        address = Address(**orm.address) if orm.address else None
+
         return Customer(
             id=orm.id,
             name=orm.name,
             phone_number=phone,
             email=orm.email,
+            address=address,
             segment=CustomerSegment(orm.segment),
             subscription_plan=SubscriptionPlan(orm.subscription_plan),
             clv_score=orm.clv_score,

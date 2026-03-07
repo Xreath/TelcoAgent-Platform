@@ -10,10 +10,10 @@ Tracks:
 from __future__ import annotations
 
 import time
+from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Generator
 
-from prometheus_client import Counter, Histogram, Gauge
+from prometheus_client import Counter, Gauge, Histogram
 
 # ── Metrics definitions ───────────────────────────────────────
 
@@ -61,9 +61,7 @@ class AgentMetrics:
     """Convenience wrapper around Prometheus metrics."""
 
     @contextmanager
-    def track_invocation(
-        self, complaint_type: str, priority: str
-    ) -> Generator[None, None, None]:
+    def track_invocation(self, complaint_type: str, priority: str) -> Generator[None, None, None]:
         """Context manager to track a full agent invocation."""
         AGENT_INVOCATIONS.labels(
             agent=AGENT_NAME,

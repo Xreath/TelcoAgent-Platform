@@ -46,26 +46,23 @@
 
 ## Development & Operations
 
-### Python Environment (Conda)
-- **Conda Env Name**: `telcoagent`
+### Python Environment (.venv)
+- **Virtual Env**: `.venv/` (project-local virtual environment)
 - **Python Version**: 3.11
-- **Location**: `/Users/fazlikoc/miniconda3/envs/telcoagent`
 
 ```bash
 # Activate environment (always use this before running anything)
-conda activate telcoagent
+source .venv/bin/activate
 
-# Create environment (one-time setup, already done)
-conda create -n telcoagent python=3.11 -y
-
-# Deactivate when done
-conda deactivate
+# Or run commands directly without activating:
+.venv/bin/python -m pytest tests/ -v
+.venv/bin/ruff check .
 ```
 
-> **IMPORTANT**: All Python work on this project must be done inside the `telcoagent` conda environment.
+> **IMPORTANT**: All Python work on this project must use the `.venv` virtual environment.
 
 ### Local Setup
-1. **Activate Env**: `conda activate telcoagent`
+1. **Activate Env**: `source .venv/bin/activate`
 2. **Dependencies**: `pip install -e ".[dev]"`
 3. **Infrastructure**: `docker compose up -d` (starts all DBs, Kafka, Monitoring, Auth).
 4. **Environment**: Copy `.env.example` to `.env` and adjust keys (e.g., OpenAI/DeepSeek API Key).

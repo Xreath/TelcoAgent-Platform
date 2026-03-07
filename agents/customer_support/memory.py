@@ -7,7 +7,7 @@ Uses Redis with TTL so sessions auto-expire after inactivity.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import redis.asyncio as redis
@@ -47,11 +47,13 @@ class RedisMemory:
     async def add_message(self, session_id: str, role: str, content: str) -> None:
         """Append a message to the session's conversation history."""
         client = await self._get_client()
-        message = json.dumps({
-            "role": role,
-            "content": content,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        })
+        message = json.dumps(
+            {
+                "role": role,
+                "content": content,
+                "timestamp": datetime.now(UTC).isoformat(),
+            }
+        )
         key = self._messages_key(session_id)
         await client.rpush(key, message)
         await client.expire(key, self._ttl)

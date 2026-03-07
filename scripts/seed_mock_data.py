@@ -9,7 +9,6 @@ Usage:
 
 import asyncio
 import random
-from decimal import Decimal
 
 from faker import Faker
 
@@ -50,14 +49,16 @@ def generate_customers(count: int = 50) -> list[dict]:
             "churning": random.uniform(10, 150),
         }[segment]
 
-        customers.append({
-            "name": fake.name(),
-            "phone_number": f"5{random.randint(30,59)}{fake.numerify('######')}",
-            "email": fake.email(),
-            "segment": segment,
-            "subscription_plan": random.choice(PLANS),
-            "clv_score": round(clv, 2),
-        })
+        customers.append(
+            {
+                "name": fake.name(),
+                "phone_number": f"5{random.randint(30, 59)}{fake.numerify('######')}",
+                "email": fake.email(),
+                "segment": segment,
+                "subscription_plan": random.choice(PLANS),
+                "clv_score": round(clv, 2),
+            }
+        )
     return customers
 
 
@@ -73,19 +74,21 @@ def generate_invoices(customer_ids: list[str], months: int = 3) -> list[dict]:
                 year -= 1
 
             base = random.uniform(50, 500)
-            invoices.append({
-                "customer_id": cid,
-                "period_year": year,
-                "period_month": month,
-                "amount": round(base, 2),
-                "currency": "TRY",
-                "status": random.choice(["paid", "paid", "paid", "issued", "overdue"]),
-                "line_items": [
-                    {"description": "Aylık hat bedeli", "amount": str(round(base * 0.3, 2))},
-                    {"description": "İnternet paketi", "amount": str(round(base * 0.5, 2))},
-                    {"description": "Katma değerli hizmetler", "amount": str(round(base * 0.2, 2))},
-                ],
-            })
+            invoices.append(
+                {
+                    "customer_id": cid,
+                    "period_year": year,
+                    "period_month": month,
+                    "amount": round(base, 2),
+                    "currency": "TRY",
+                    "status": random.choice(["paid", "paid", "paid", "issued", "overdue"]),
+                    "line_items": [
+                        {"description": "Aylık hat bedeli", "amount": str(round(base * 0.3, 2))},
+                        {"description": "İnternet paketi", "amount": str(round(base * 0.5, 2))},
+                        {"description": "Katma değerli hizmetler", "amount": str(round(base * 0.2, 2))},
+                    ],
+                }
+            )
     return invoices
 
 
@@ -96,13 +99,15 @@ def generate_complaints(customer_ids: list[str]) -> list[dict]:
     for cid in complainers:
         num_complaints = random.randint(1, 3)
         for _ in range(num_complaints):
-            complaints.append({
-                "customer_id": cid,
-                "complaint_type": random.choice(COMPLAINT_TYPES),
-                "description": random.choice(MOCK_COMPLAINTS),
-                "priority": random.choice(PRIORITIES),
-                "status": random.choice(["open", "open", "in_progress", "resolved"]),
-            })
+            complaints.append(
+                {
+                    "customer_id": cid,
+                    "complaint_type": random.choice(COMPLAINT_TYPES),
+                    "description": random.choice(MOCK_COMPLAINTS),
+                    "priority": random.choice(PRIORITIES),
+                    "status": random.choice(["open", "open", "in_progress", "resolved"]),
+                }
+            )
     return complaints
 
 
@@ -114,15 +119,17 @@ def generate_network_nodes(count: int = 20) -> list[dict]:
     nodes = []
     for i in range(count):
         city = random.choice(cities)
-        nodes.append({
-            "node_id": f"NODE-{city[:3].upper()}-{i:03d}",
-            "node_type": random.choice(node_types),
-            "city": city,
-            "status": random.choice(statuses),
-            "latitude": round(random.uniform(36.0, 42.0), 6),
-            "longitude": round(random.uniform(26.0, 44.0), 6),
-            "connected_customers": random.randint(50, 5000),
-        })
+        nodes.append(
+            {
+                "node_id": f"NODE-{city[:3].upper()}-{i:03d}",
+                "node_type": random.choice(node_types),
+                "city": city,
+                "status": random.choice(statuses),
+                "latitude": round(random.uniform(36.0, 42.0), 6),
+                "longitude": round(random.uniform(26.0, 44.0), 6),
+                "connected_customers": random.randint(50, 5000),
+            }
+        )
     return nodes
 
 
@@ -135,6 +142,7 @@ async def seed():
 
     # Use fake UUIDs for demo (real seeding would use actual DB IDs)
     import uuid
+
     fake_ids = [str(uuid.uuid4()) for _ in customers]
 
     invoices = generate_invoices(fake_ids, months=3)
@@ -150,6 +158,7 @@ async def seed():
     print("To seed the database, integrate with FastAPI startup or run via Alembic seed.")
     print("\nSample customer:")
     import json
+
     print(json.dumps(customers[0], indent=2, ensure_ascii=False))
 
 
