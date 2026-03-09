@@ -26,6 +26,7 @@ from langgraph.prebuilt import create_react_agent
 
 from agents.billing_analyst.tools import ALL_TOOLS
 from shared.config.settings import get_settings
+from shared.security import PromptInjectionError, sanitize_input
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -123,6 +124,19 @@ class BillingAnalystAgentRunner:
         """Process a billing dispute end-to-end."""
         session_id = str(uuid.uuid4())
 
+        # Sanitize user-controlled input
+        try:
+            reason = sanitize_input(reason, field_name="dispute_reason")
+        except PromptInjectionError as e:
+            logger.error("Prompt injection in dispute from customer %s: %s", customer_id, e)
+            return {
+                "session_id": session_id,
+                "customer_id": customer_id,
+                "invoice_id": invoice_id,
+                "response": "İtiraz içeriği güvenlik kontrolünden geçemedi.",
+                "message_count": 0,
+            }
+
         message = (
             f"Fatura İtirazı:\n"
             f"- Müşteri ID: {customer_id}\n"
@@ -171,6 +185,19 @@ class BillingAnalystAgentRunner:
     ) -> dict[str, Any]:
         """Process a billing anomaly detection event."""
         session_id = str(uuid.uuid4())
+
+        # Sanitize user-controlled input
+        try:
+            description = sanitize_input(description, field_name="anomaly_description")
+        except PromptInjectionError as e:
+            logger.error("Prompt injection in anomaly from customer %s: %s", customer_id, e)
+            return {
+                "session_id": session_id,
+                "customer_id": customer_id,
+                "anomaly_type": anomaly_type,
+                "response": "Anomali açıklaması güvenlik kontrolünden geçemedi.",
+                "message_count": 0,
+            }
 
         message = (
             f"Fatura Anomali Tespiti:\n"

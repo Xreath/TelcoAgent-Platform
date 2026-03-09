@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: telco-network-service
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "telco-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/name: network-service
+spec:
+  replicas: {{ .Values.networkService.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: network-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: network-service
+    spec:
+      containers:
+        - name: network-service
+          image: "{{ .Values.networkService.image.repository }}:{{ .Values.networkService.image.tag }}"
+          imagePullPolicy: {{ .Values.networkService.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.networkService.port }}
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: telco-agent-config
+            - secretRef:
+                name: telco-agent-secrets
+          resources:
+            {{- toYaml .Values.networkService.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.networkService.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.networkService.port }}
+            initialDelaySeconds: 15
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: telco-network-service
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "telco-agent.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.networkService.port }}
+      targetPort: {{ .Values.networkService.port }}
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: network-service

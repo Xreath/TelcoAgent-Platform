@@ -46,7 +46,7 @@ Line length is 120 characters (ruff). Mypy is configured in strict mode.
 ```
 services/<domain>/       # DDD Bounded Contexts (customer, billing, network, campaign)
 agents/<name>/           # AI agents (customer_support implemented; others stubbed)
-infrastructure/          # Cross-cutting infra (MCP servers, gRPC protos, Docker, Keycloak)
+infrastructure/          # Cross-cutting infra (MCP servers, Docker, Keycloak, monitoring)
 shared/                  # Reusable base classes, config, database utils
 ```
 
@@ -106,6 +106,5 @@ Copy `.env.example` to `.env`. Services expect:
 - Redis on `localhost:6379`
 - Kafka on `localhost:9092`
 - Keycloak on `localhost:8080`
-- MongoDB on `localhost:27017`, Qdrant on `localhost:6333`
 
 DB schema is initialized at startup via SQLAlchemy `create_all`. The `infrastructure/docker/init-db.sql` sets up the `outbox.events` table and pgvector extension.

@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: telco-customer-support-agent
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "telco-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/name: customer-support-agent
+spec:
+  replicas: {{ .Values.customerSupportAgent.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: customer-support-agent
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: customer-support-agent
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "{{ .Values.customerSupportAgent.port }}"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+        - name: customer-support-agent
+          image: "{{ .Values.customerSupportAgent.image.repository }}:{{ .Values.customerSupportAgent.image.tag }}"
+          imagePullPolicy: {{ .Values.customerSupportAgent.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.customerSupportAgent.port }}
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: telco-agent-config
+            - secretRef:
+                name: telco-agent-secrets
+          resources:
+            {{- toYaml .Values.customerSupportAgent.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.customerSupportAgent.port }}
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.customerSupportAgent.port }}
+            initialDelaySeconds: 20
+            periodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: telco-customer-support-agent
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "telco-agent.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.customerSupportAgent.port }}
+      targetPort: {{ .Values.customerSupportAgent.port }}
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: customer-support-agent

@@ -1,5 +1,3 @@
-version: "3.9"
-
 # ============================================================
 # TelcoAgent Platform — Local Development Stack
 # ============================================================
@@ -43,36 +41,6 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-    networks:
-      - telco-net
-
-  # ── MongoDB ────────────────────────────────────────────────
-  mongodb:
-    image: mongo:7
-    container_name: telco-mongodb
-    environment:
-      MONGO_INITDB_DATABASE: telco_episodic
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongo_data:/data/db
-    healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    networks:
-      - telco-net
-
-  # ── Qdrant ─────────────────────────────────────────────────
-  qdrant:
-    image: qdrant/qdrant:latest
-    container_name: telco-qdrant
-    ports:
-      - "6333:6333"
-      - "6334:6334"
-    volumes:
-      - qdrant_data:/qdrant/storage
     networks:
       - telco-net
 
@@ -172,22 +140,6 @@ services:
     networks:
       - telco-net
 
-  # ── Schema Registry (Avro) ─────────────────────────────────
-  schema-registry:
-    image: confluentinc/cp-schema-registry:7.7.1
-    container_name: telco-schema-registry
-    depends_on:
-      kafka:
-        condition: service_healthy
-    environment:
-      SCHEMA_REGISTRY_HOST_NAME: schema-registry
-      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: kafka:29092
-      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
-    ports:
-      - "8081:8081"
-    networks:
-      - telco-net
-
   # ── Kafka UI ───────────────────────────────────────────────
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
@@ -198,7 +150,6 @@ services:
     environment:
       KAFKA_CLUSTERS_0_NAME: telco-local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
-      KAFKA_CLUSTERS_0_SCHEMAREGISTRY: http://schema-registry:8081
     ports:
       - "8082:8080"
     networks:
@@ -227,38 +178,6 @@ services:
     networks:
       - telco-net
 
-  # ── Temporal ───────────────────────────────────────────────
-  temporal:
-    image: temporalio/auto-setup:1.25
-    container_name: telco-temporal
-    environment:
-      DB: postgresql
-      DB_PORT: 5432
-      POSTGRES_USER: telco
-      POSTGRES_PWD: telco_secret
-      POSTGRES_SEEDS: postgres
-      DYNAMIC_CONFIG_FILE_PATH: config/dynamicconfig/development-sql.yaml
-    ports:
-      - "7233:7233"
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - telco-net
-
-  temporal-ui:
-    image: temporalio/ui:2.31.2
-    container_name: telco-temporal-ui
-    environment:
-      TEMPORAL_ADDRESS: temporal:7233
-      TEMPORAL_CORS_ORIGINS: http://localhost:3000
-    ports:
-      - "8083:8080"
-    depends_on:
-      - temporal
-    networks:
-      - telco-net
-
   # ── Customer Support Agent ─────────────────────────────────
   customer-support-agent:
     build:
@@ -268,7 +187,6 @@ services:
     environment:
       POSTGRES_HOST: postgres
       REDIS_HOST: redis
-      MONGO_HOST: mongodb
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       CUSTOMER_SERVICE_URL: http://customer-service:8001/v1/customers
       BILLING_SERVICE_URL: http://billing-service:8002/v1/billing
@@ -322,7 +240,21 @@ services:
       - "9090:9090"
     volumes:
       - ./infrastructure/monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./infrastructure/monitoring/prometheus/alert_rules.yml:/etc/prometheus/alert_rules.yml
       - prometheus_data:/prometheus
+    networks:
+      - telco-net
+
+  # ── Alertmanager ─────────────────────────────────────────
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: telco-alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./infrastructure/monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
     networks:
       - telco-net
 
@@ -338,7 +270,9 @@ services:
       - "3000:3000"
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./infrastructure/monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./infrastructure/monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ./infrastructure/monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+      - ./infrastructure/monitoring/grafana/dashboards:/var/lib/grafana/dashboards
     depends_on:
       - prometheus
     networks:
@@ -373,8 +307,6 @@ services:
 volumes:
   postgres_data:
   redis_data:
-  mongo_data:
-  qdrant_data:
   zookeeper_data:
   zookeeper_logs:
   kafka_data:

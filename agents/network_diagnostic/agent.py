@@ -27,6 +27,7 @@ from langgraph.prebuilt import create_react_agent
 
 from agents.network_diagnostic.tools import ALL_TOOLS
 from shared.config.settings import get_settings
+from shared.security import PromptInjectionError, sanitize_input
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -123,6 +124,19 @@ class NetworkDiagnosticAgentRunner:
     ) -> dict[str, Any]:
         """Process a network anomaly event end-to-end."""
         session_id = str(uuid.uuid4())
+
+        # Sanitize user-controlled input
+        try:
+            description = sanitize_input(description, field_name="network_anomaly_description")
+        except PromptInjectionError as e:
+            logger.error("Prompt injection in network anomaly: %s", e)
+            return {
+                "session_id": session_id,
+                "node_id": node_id,
+                "anomaly_type": anomaly_type,
+                "response": "Anomali açıklaması güvenlik kontrolünden geçemedi.",
+                "message_count": 0,
+            }
 
         message = (
             f"Ağ Anomali Raporu:\n"

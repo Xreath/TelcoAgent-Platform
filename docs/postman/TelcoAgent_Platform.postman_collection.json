@@ -1,0 +1,470 @@
+{
+  "info": {
+    "name": "TelcoAgent Platform",
+    "description": "Enterprise Agentic AI Platform for Telecom Operations.\n\nServices:\n- Customer Service (8001)\n- Billing Service (8002)\n- Network Service (8003)\n- Campaign Service (8004)\n- Customer Support Agent (8010)\n\nAuth: Keycloak OAuth2.0 — Bearer token required on all endpoints.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost" },
+    { "key": "customer_url", "value": "http://localhost:8001" },
+    { "key": "billing_url", "value": "http://localhost:8002" },
+    { "key": "network_url", "value": "http://localhost:8003" },
+    { "key": "campaign_url", "value": "http://localhost:8004" },
+    { "key": "agent_url", "value": "http://localhost:8010" },
+    { "key": "keycloak_url", "value": "http://localhost:8080" },
+    { "key": "access_token", "value": "" },
+    { "key": "customer_id", "value": "" },
+    { "key": "invoice_id", "value": "" },
+    { "key": "node_id", "value": "" },
+    { "key": "campaign_id", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Get Token (Password Grant)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "pm.collectionVariables.set('access_token', jsonData.access_token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "grant_type", "value": "password" },
+                { "key": "client_id", "value": "admin-ui" },
+                { "key": "username", "value": "admin-user" },
+                { "key": "password", "value": "admin123" },
+                { "key": "scope", "value": "openid" }
+              ]
+            },
+            "url": {
+              "raw": "{{keycloak_url}}/realms/telco-agents/protocol/openid-connect/token",
+              "host": ["{{keycloak_url}}"],
+              "path": ["realms", "telco-agents", "protocol", "openid-connect", "token"]
+            }
+          }
+        },
+        {
+          "name": "Get Token (Client Credentials)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "pm.collectionVariables.set('access_token', jsonData.access_token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "grant_type", "value": "client_credentials" },
+                { "key": "client_id", "value": "customer-service" },
+                { "key": "client_secret", "value": "customer-service-secret" }
+              ]
+            },
+            "url": {
+              "raw": "{{keycloak_url}}/realms/telco-agents/protocol/openid-connect/token",
+              "host": ["{{keycloak_url}}"],
+              "path": ["realms", "telco-agents", "protocol", "openid-connect", "token"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Customer Service",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": { "raw": "{{customer_url}}/health", "host": ["{{customer_url}}"], "path": ["health"] }
+          }
+        },
+        {
+          "name": "Register Customer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.id) pm.collectionVariables.set('customer_id', jsonData.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Ahmet Yilmaz\",\n  \"phone_number\": \"+905551234567\",\n  \"email\": \"ahmet@example.com\",\n  \"subscription_plan\": \"postpaid_premium\"\n}"
+            },
+            "url": { "raw": "{{customer_url}}/v1/customers/", "host": ["{{customer_url}}"], "path": ["v1", "customers", ""] }
+          }
+        },
+        {
+          "name": "List Customers",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{customer_url}}/v1/customers/?skip=0&limit=10",
+              "host": ["{{customer_url}}"],
+              "path": ["v1", "customers", ""],
+              "query": [
+                { "key": "skip", "value": "0" },
+                { "key": "limit", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Customer",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{customer_url}}/v1/customers/{{customer_id}}", "host": ["{{customer_url}}"], "path": ["v1", "customers", "{{customer_id}}"] }
+          }
+        },
+        {
+          "name": "File Complaint",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"complaint_type\": \"billing\",\n  \"description\": \"Faturamda tanımadığım bir ücret var, 150 TL fazla kesilmiş.\",\n  \"priority\": \"high\"\n}"
+            },
+            "url": { "raw": "{{customer_url}}/v1/customers/{{customer_id}}/complaints", "host": ["{{customer_url}}"], "path": ["v1", "customers", "{{customer_id}}", "complaints"] }
+          }
+        },
+        {
+          "name": "Get Complaints",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{customer_url}}/v1/customers/{{customer_id}}/complaints", "host": ["{{customer_url}}"], "path": ["v1", "customers", "{{customer_id}}", "complaints"] }
+          }
+        },
+        {
+          "name": "Change Segment",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"new_segment\": \"gold\",\n  \"reason\": \"High CLV score and loyalty\"\n}"
+            },
+            "url": { "raw": "{{customer_url}}/v1/customers/{{customer_id}}/segment", "host": ["{{customer_url}}"], "path": ["v1", "customers", "{{customer_id}}", "segment"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Billing Service",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": { "raw": "{{billing_url}}/health", "host": ["{{billing_url}}"], "path": ["health"] }
+          }
+        },
+        {
+          "name": "Create Invoice",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.id) pm.collectionVariables.set('invoice_id', jsonData.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer_id\": \"{{customer_id}}\",\n  \"amount\": 189.90,\n  \"currency\": \"TRY\",\n  \"billing_year\": 2026,\n  \"billing_month\": 3,\n  \"line_items\": [\n    {\"description\": \"Postpaid Premium Plan\", \"amount\": \"149.90\"},\n    {\"description\": \"Data overage 5GB\", \"amount\": \"40.00\"}\n  ]\n}"
+            },
+            "url": { "raw": "{{billing_url}}/v1/billing/invoices", "host": ["{{billing_url}}"], "path": ["v1", "billing", "invoices"] }
+          }
+        },
+        {
+          "name": "List Invoices",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{billing_url}}/v1/billing/invoices?customer_id={{customer_id}}",
+              "host": ["{{billing_url}}"],
+              "path": ["v1", "billing", "invoices"],
+              "query": [{ "key": "customer_id", "value": "{{customer_id}}" }]
+            }
+          }
+        },
+        {
+          "name": "Get Invoice",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{billing_url}}/v1/billing/invoices/{{invoice_id}}", "host": ["{{billing_url}}"], "path": ["v1", "billing", "invoices", "{{invoice_id}}"] }
+          }
+        },
+        {
+          "name": "Pay Invoice",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{billing_url}}/v1/billing/invoices/{{invoice_id}}/pay", "host": ["{{billing_url}}"], "path": ["v1", "billing", "invoices", "{{invoice_id}}", "pay"] }
+          }
+        },
+        {
+          "name": "Open Dispute",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Incorrect data overage charge\"\n}"
+            },
+            "url": { "raw": "{{billing_url}}/v1/billing/invoices/{{invoice_id}}/dispute", "host": ["{{billing_url}}"], "path": ["v1", "billing", "invoices", "{{invoice_id}}", "dispute"] }
+          }
+        },
+        {
+          "name": "Resolve Dispute",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"resolution\": \"Credit applied for data overage\",\n  \"credit_amount\": 40.0\n}"
+            },
+            "url": { "raw": "{{billing_url}}/v1/billing/invoices/{{invoice_id}}/resolve-dispute", "host": ["{{billing_url}}"], "path": ["v1", "billing", "invoices", "{{invoice_id}}", "resolve-dispute"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Network Service",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": { "raw": "{{network_url}}/health", "host": ["{{network_url}}"], "path": ["health"] }
+          }
+        },
+        {
+          "name": "List Nodes",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{network_url}}/v1/network/nodes", "host": ["{{network_url}}"], "path": ["v1", "network", "nodes"] }
+          }
+        },
+        {
+          "name": "Get Node",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{network_url}}/v1/network/nodes/{{node_id}}", "host": ["{{network_url}}"], "path": ["v1", "network", "nodes", "{{node_id}}"] }
+          }
+        },
+        {
+          "name": "Create Node",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"istanbul-bts-042\",\n  \"node_type\": \"base_station\",\n  \"region\": \"istanbul\",\n  \"latitude\": 41.0082,\n  \"longitude\": 28.9784\n}"
+            },
+            "url": { "raw": "{{network_url}}/v1/network/nodes", "host": ["{{network_url}}"], "path": ["v1", "network", "nodes"] }
+          }
+        },
+        {
+          "name": "Update Node Status",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"degraded\",\n  \"reason\": \"High packet loss detected\"\n}"
+            },
+            "url": { "raw": "{{network_url}}/v1/network/nodes/{{node_id}}/status", "host": ["{{network_url}}"], "path": ["v1", "network", "nodes", "{{node_id}}", "status"] }
+          }
+        },
+        {
+          "name": "Run Diagnostics",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{network_url}}/v1/network/nodes/{{node_id}}/diagnose", "host": ["{{network_url}}"], "path": ["v1", "network", "nodes", "{{node_id}}", "diagnose"] }
+          }
+        },
+        {
+          "name": "Get Node Metrics",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{network_url}}/v1/network/nodes/{{node_id}}/metrics", "host": ["{{network_url}}"], "path": ["v1", "network", "nodes", "{{node_id}}", "metrics"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Campaign Service",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": { "raw": "{{campaign_url}}/health", "host": ["{{campaign_url}}"], "path": ["health"] }
+          }
+        },
+        {
+          "name": "List Campaigns",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{campaign_url}}/v1/campaigns", "host": ["{{campaign_url}}"], "path": ["v1", "campaigns"] }
+          }
+        },
+        {
+          "name": "Create Campaign",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.id) pm.collectionVariables.set('campaign_id', jsonData.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Spring Data Promotion\",\n  \"campaign_type\": \"retention\",\n  \"target_segment\": \"gold\",\n  \"description\": \"Offer 50% extra data to gold segment customers to reduce churn\"\n}"
+            },
+            "url": { "raw": "{{campaign_url}}/v1/campaigns", "host": ["{{campaign_url}}"], "path": ["v1", "campaigns"] }
+          }
+        },
+        {
+          "name": "Get Campaign",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{campaign_url}}/v1/campaigns/{{campaign_id}}", "host": ["{{campaign_url}}"], "path": ["v1", "campaigns", "{{campaign_id}}"] }
+          }
+        },
+        {
+          "name": "Update Campaign Status",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"active\"\n}"
+            },
+            "url": { "raw": "{{campaign_url}}/v1/campaigns/{{campaign_id}}/status", "host": ["{{campaign_url}}"], "path": ["v1", "campaigns", "{{campaign_id}}", "status"] }
+          }
+        },
+        {
+          "name": "Add A/B Variant",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"variant_name\": \"variant_a\",\n  \"content\": \"Sizin için özel! 50% ekstra data paketi sadece bu hafta.\",\n  \"weight\": 0.5\n}"
+            },
+            "url": { "raw": "{{campaign_url}}/v1/campaigns/{{campaign_id}}/variants", "host": ["{{campaign_url}}"], "path": ["v1", "campaigns", "{{campaign_id}}", "variants"] }
+          }
+        },
+        {
+          "name": "List Variants",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{campaign_url}}/v1/campaigns/{{campaign_id}}/variants", "host": ["{{campaign_url}}"], "path": ["v1", "campaigns", "{{campaign_id}}", "variants"] }
+          }
+        },
+        {
+          "name": "Generate Campaign Text",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{campaign_url}}/v1/campaigns/{{campaign_id}}/generate", "host": ["{{campaign_url}}"], "path": ["v1", "campaigns", "{{campaign_id}}", "generate"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Agent",
+      "item": [
+        {
+          "name": "Agent Health Check",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": { "raw": "{{agent_url}}/health", "host": ["{{agent_url}}"], "path": ["health"] }
+          }
+        },
+        {
+          "name": "Trigger Agent (Manual)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer_id\": \"{{customer_id}}\",\n  \"complaint_type\": \"billing\",\n  \"description\": \"Faturamda 150 TL fazla ücret kesilmiş, açıklama yok.\",\n  \"priority\": \"high\"\n}"
+            },
+            "url": { "raw": "{{agent_url}}/v1/agent/complaint", "host": ["{{agent_url}}"], "path": ["v1", "agent", "complaint"] }
+          }
+        },
+        {
+          "name": "Prometheus Metrics",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": { "raw": "{{agent_url}}/metrics", "host": ["{{agent_url}}"], "path": ["metrics"] }
+          }
+        }
+      ]
+    }
+  ]
+}

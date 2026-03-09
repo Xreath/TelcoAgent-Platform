@@ -35,22 +35,8 @@ class Settings(BaseSettings):
     def redis_url(self) -> str:
         return f"redis://{self.redis_host}:{self.redis_port}"
 
-    # MongoDB
-    mongo_host: str = "localhost"
-    mongo_port: int = 27017
-    mongo_db: str = "telco_episodic"
-
-    @property
-    def mongo_url(self) -> str:
-        return f"mongodb://{self.mongo_host}:{self.mongo_port}"
-
-    # Qdrant
-    qdrant_host: str = "localhost"
-    qdrant_port: int = 6333
-
     # Kafka
     kafka_bootstrap_servers: str = "localhost:9092"
-    schema_registry_url: str = "http://localhost:8081"
 
     # Keycloak
     keycloak_url: str = "http://localhost:8080"

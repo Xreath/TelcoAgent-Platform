@@ -1,0 +1,89 @@
+# ============================================================
+# Prometheus Alert Rules — TelcoAgent Platform
+# ============================================================
+
+groups:
+  - name: agent_alerts
+    rules:
+      # ── Token Budget ───────────────────────────────────────
+      - alert: TokenBudgetHigh
+        expr: sum(rate(agent_token_usage_total[1h])) * 3600 > 100000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Token usage rate exceeds 100K/hour"
+          description: "Current hourly token rate: {{ $value | humanize }} tokens/hour"
+
+      - alert: TokenBudgetCritical
+        expr: sum(rate(agent_token_usage_total[1h])) * 3600 > 500000
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Token usage rate exceeds 500K/hour — possible runaway agent"
+          description: "Current hourly token rate: {{ $value | humanize }} tokens/hour. Check for infinite loops."
+
+      # ── Latency ────────────────────────────────────────────
+      - alert: AgentLatencyHigh
+        expr: histogram_quantile(0.95, sum(rate(agent_latency_seconds_bucket[5m])) by (le, agent)) > 30
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Agent p95 latency > 30s"
+          description: "Agent {{ $labels.agent }} p95 latency is {{ $value | humanize }}s"
+
+      - alert: AgentLatencyCritical
+        expr: histogram_quantile(0.99, sum(rate(agent_latency_seconds_bucket[5m])) by (le, agent)) > 120
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Agent p99 latency > 2 minutes"
+          description: "Agent {{ $labels.agent }} p99 latency is {{ $value | humanize }}s. Possible timeout."
+
+      # ── Error Rate ─────────────────────────────────────────
+      - alert: AgentErrorRateHigh
+        expr: |
+          sum(rate(agent_errors_total[5m])) by (agent)
+          / sum(rate(agent_invocations_total[5m])) by (agent) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Agent error rate > 10%"
+          description: "Agent {{ $labels.agent }} error rate is {{ $value | humanizePercentage }}"
+
+      - alert: AgentErrorRateCritical
+        expr: |
+          sum(rate(agent_errors_total[5m])) by (agent)
+          / sum(rate(agent_invocations_total[5m])) by (agent) > 0.3
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Agent error rate > 30%"
+          description: "Agent {{ $labels.agent }} error rate is {{ $value | humanizePercentage }}. Investigate immediately."
+
+      # ── DLQ Growth ─────────────────────────────────────────
+      - alert: DLQGrowing
+        expr: sum(rate(agent_errors_total{error_type="processing"}[15m])) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "DLQ receiving messages — processing errors detected"
+          description: "Processing errors are occurring at {{ $value | humanize }}/s. Check DLQ topics."
+
+  - name: infrastructure_alerts
+    rules:
+      # ── Service Health ─────────────────────────────────────
+      - alert: ServiceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service {{ $labels.job }} is down"
+          description: "Prometheus cannot reach {{ $labels.instance }} for job {{ $labels.job }}"

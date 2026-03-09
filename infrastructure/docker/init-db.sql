@@ -21,10 +21,6 @@ CREATE SCHEMA IF NOT EXISTS outbox;
 -- Keycloak schema
 CREATE SCHEMA IF NOT EXISTS keycloak;
 
--- Temporal needs its own databases (auto-setup handles this)
--- But we ensure the schema exists for shared usage
-CREATE SCHEMA IF NOT EXISTS temporal_visibility;
-
 -- ============================================================
 -- Outbox table (used by all domain services)
 -- ============================================================

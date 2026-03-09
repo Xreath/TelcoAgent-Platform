@@ -26,6 +26,7 @@ from langgraph.prebuilt import create_react_agent
 
 from agents.campaign.tools import ALL_TOOLS
 from shared.config.settings import get_settings
+from shared.security import PromptInjectionError, sanitize_input
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -123,6 +124,20 @@ class CampaignAgentRunner:
     ) -> dict[str, Any]:
         """Generate a campaign for a target segment or specific customer."""
         session_id = str(uuid.uuid4())
+
+        # Sanitize user-controlled inputs
+        try:
+            product = sanitize_input(product, field_name="campaign_product")
+            campaign_goal = sanitize_input(campaign_goal, field_name="campaign_goal")
+        except PromptInjectionError as e:
+            logger.error("Prompt injection in campaign request: %s", e)
+            return {
+                "session_id": session_id,
+                "target_segment": target_segment,
+                "campaign_type": campaign_type,
+                "response": "Kampanya içeriği güvenlik kontrolünden geçemedi.",
+                "message_count": 0,
+            }
 
         message_parts = ["Kampanya Talebi:"]
         if customer_id:

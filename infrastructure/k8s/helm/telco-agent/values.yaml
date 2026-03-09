@@ -1,0 +1,159 @@
+# ============================================================
+# TelcoAgent Platform — Helm Values
+# ============================================================
+
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+  namespace: telco
+
+# ── Application Services ─────────────────────────────────────
+
+customerService:
+  replicaCount: 2
+  image:
+    repository: telco-agent/customer-service
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+  port: 8001
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  env:
+    POSTGRES_HOST: telco-postgres
+    REDIS_HOST: telco-redis
+    KAFKA_BOOTSTRAP_SERVERS: telco-kafka:9092
+    KEYCLOAK_URL: http://telco-keycloak:8080
+
+billingService:
+  replicaCount: 2
+  image:
+    repository: telco-agent/billing-service
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+  port: 8002
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  env:
+    POSTGRES_HOST: telco-postgres
+    REDIS_HOST: telco-redis
+    KAFKA_BOOTSTRAP_SERVERS: telco-kafka:9092
+
+networkService:
+  replicaCount: 1
+  image:
+    repository: telco-agent/network-service
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+  port: 8003
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  env:
+    POSTGRES_HOST: telco-postgres
+    KAFKA_BOOTSTRAP_SERVERS: telco-kafka:9092
+
+campaignService:
+  replicaCount: 1
+  image:
+    repository: telco-agent/campaign-service
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+  port: 8004
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  env:
+    POSTGRES_HOST: telco-postgres
+    KAFKA_BOOTSTRAP_SERVERS: telco-kafka:9092
+
+# ── Agent Services ───────────────────────────────────────────
+
+customerSupportAgent:
+  replicaCount: 1
+  image:
+    repository: telco-agent/customer-support-agent
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+  port: 8010
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  env:
+    KAFKA_BOOTSTRAP_SERVERS: telco-kafka:9092
+    REDIS_HOST: telco-redis
+    CUSTOMER_SERVICE_URL: http://telco-customer-service:8001/v1/customers
+    BILLING_SERVICE_URL: http://telco-billing-service:8002/v1/billing
+
+# ── Infrastructure ───────────────────────────────────────────
+
+postgres:
+  enabled: true
+  image:
+    repository: pgvector/pgvector
+    tag: pg16
+  port: 5432
+  auth:
+    username: telco
+    password: telco_secret
+    database: telcoagent
+  persistence:
+    size: 5Gi
+
+redis:
+  enabled: true
+  image:
+    repository: redis
+    tag: 7-alpine
+  port: 6379
+  persistence:
+    size: 1Gi
+
+kafka:
+  enabled: true
+  image:
+    repository: confluentinc/cp-kafka
+    tag: "7.7.1"
+  port: 9092
+
+keycloak:
+  enabled: true
+  image:
+    repository: quay.io/keycloak/keycloak
+    tag: "26.0"
+  port: 8080
+  admin:
+    username: admin
+    password: admin
+
+prometheus:
+  enabled: true
+  port: 9090
+
+grafana:
+  enabled: true
+  port: 3000
+  admin:
+    username: admin
+    password: admin

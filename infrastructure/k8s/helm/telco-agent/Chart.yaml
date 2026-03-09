@@ -1,0 +1,12 @@
+apiVersion: v2
+name: telco-agent
+description: TelcoAgent Platform — Enterprise Agentic AI for Telecom Operations
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - telco
+  - ai-agent
+  - langgraph
+  - kafka
+  - mcp

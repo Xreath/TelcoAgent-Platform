@@ -1,6 +1,6 @@
-"""REST vs gRPC vs MCP — Protocol Benchmark.
+"""REST vs MCP — Protocol Benchmark.
 
-Compares latency and throughput of the three communication protocols
+Compares latency and throughput of the two communication protocols
 used in the TelcoAgent platform.
 
 Usage:
@@ -9,7 +9,6 @@ Usage:
 Prerequisites:
     - Customer Service running on :8001 (REST)
     - Customer MCP server importable (MCP)
-    - gRPC server on :50051 (gRPC) — optional
 
 Results are printed as a comparison table.
 """
@@ -101,23 +100,6 @@ async def benchmark_mcp(customer_id: str, iterations: int = 50) -> BenchmarkResu
     return _compute_result("MCP", "get_customer", iterations, latencies)
 
 
-async def benchmark_grpc(customer_id: str, iterations: int = 50) -> BenchmarkResult:
-    """Benchmark gRPC calls (placeholder — gRPC server not yet implemented)."""
-    # gRPC server is defined in .proto but not implemented as a running service yet
-    # This is a placeholder that estimates based on typical gRPC overhead
-    latencies = []
-
-    for _ in range(iterations):
-        start = time.perf_counter()
-        # Simulate gRPC call overhead (serialization + deserialization)
-        await asyncio.sleep(0.001)  # ~1ms simulated
-        elapsed = (time.perf_counter() - start) * 1000
-        latencies.append(elapsed)
-
-    result = _compute_result("gRPC (simulated)", "get_customer", iterations, latencies)
-    return result
-
-
 def _compute_result(protocol: str, operation: str, iterations: int, latencies: list[float]) -> BenchmarkResult:
     if not latencies:
         return BenchmarkResult(
@@ -149,7 +131,7 @@ def _compute_result(protocol: str, operation: str, iterations: int, latencies: l
 def print_results(results: list[BenchmarkResult]) -> None:
     """Print benchmark results as a formatted table."""
     print("\n" + "=" * 80)
-    print("  REST vs gRPC vs MCP — Protocol Benchmark Results")
+    print("  REST vs MCP — Protocol Benchmark Results")
     print("=" * 80)
     print(f"{'Protocol':<20} {'Avg (ms)':<10} {'P50':<10} {'P95':<10} {'P99':<10} {'Min':<10} {'Max':<10}")
     print("-" * 80)
@@ -169,7 +151,6 @@ def print_results(results: list[BenchmarkResult]) -> None:
         fastest = min(available, key=lambda r: r.avg_ms)
         print(f"  Fastest: {fastest.protocol} (avg {fastest.avg_ms}ms)")
     print("  Note: MCP adds tool schema overhead but enables dynamic discovery.")
-    print("  Note: gRPC results are simulated — real numbers require running gRPC server.")
     print()
 
 
@@ -183,7 +164,6 @@ async def main():
     results = await asyncio.gather(
         benchmark_rest(customer_id, iterations),
         benchmark_mcp(customer_id, iterations),
-        benchmark_grpc(customer_id, iterations),
     )
 
     print_results(list(results))

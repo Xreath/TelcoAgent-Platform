@@ -1,4 +1,8 @@
-"""Customer Service — FastAPI REST endpoints (v1)."""
+"""Customer Service — FastAPI REST endpoints (v1).
+
+Auth: All endpoints require a valid Keycloak JWT.
+Write operations require 'agent-operator' or 'agent-supervisor' role.
+"""
 
 from typing import Annotated, Any
 from uuid import UUID
@@ -14,6 +18,7 @@ from services.customer.application.commands.handlers import (
     RegisterCustomerCommand,
 )
 from services.customer.application.queries.handlers import ComplaintDTO, CustomerDTO, CustomerQueryHandlers
+from shared.auth import TokenPayload, get_current_user, require_role
 from shared.utils.database import get_db_session
 
 router = APIRouter(prefix="/v1/customers", tags=["customers"])
@@ -46,6 +51,7 @@ class ChangeSegmentRequest(BaseModel):
 async def register_customer(
     body: RegisterCustomerRequest,
     session: Annotated[AsyncSession, Depends(get_db_session)],
+    _user: Annotated[TokenPayload, Depends(require_role("agent-operator"))],
 ) -> CustomerDTO:
     """Register a new telecom customer."""
     handlers = CustomerCommandHandlers(session)
@@ -72,6 +78,7 @@ async def register_customer(
 @router.get("/")
 async def list_customers(
     session: Annotated[AsyncSession, Depends(get_db_session)],
+    _user: Annotated[TokenPayload, Depends(get_current_user)],
     skip: int = 0,
     limit: int = 50,
 ) -> list[CustomerDTO]:
@@ -84,6 +91,7 @@ async def list_customers(
 async def get_customer(
     customer_id: UUID,
     session: Annotated[AsyncSession, Depends(get_db_session)],
+    _user: Annotated[TokenPayload, Depends(get_current_user)],
 ) -> CustomerDTO:
     """Get a single customer by ID."""
     handlers = CustomerQueryHandlers(session)
@@ -98,6 +106,7 @@ async def file_complaint(
     customer_id: UUID,
     body: FileComplaintRequest,
     session: Annotated[AsyncSession, Depends(get_db_session)],
+    _user: Annotated[TokenPayload, Depends(require_role("agent-operator"))],
 ) -> dict[str, Any]:
     """File a complaint — triggers CustomerSupportAgent via Kafka."""
     handlers = CustomerCommandHandlers(session)
@@ -119,6 +128,7 @@ async def file_complaint(
 async def get_complaints(
     customer_id: UUID,
     session: Annotated[AsyncSession, Depends(get_db_session)],
+    _user: Annotated[TokenPayload, Depends(get_current_user)],
 ) -> list[ComplaintDTO]:
     """List all complaints for a customer."""
     handlers = CustomerQueryHandlers(session)
@@ -130,6 +140,7 @@ async def change_segment(
     customer_id: UUID,
     body: ChangeSegmentRequest,
     session: Annotated[AsyncSession, Depends(get_db_session)],
+    _user: Annotated[TokenPayload, Depends(require_role("agent-supervisor"))],
 ) -> dict[str, Any]:
     """Change customer segment (gold, silver, etc.)."""
     handlers = CustomerCommandHandlers(session)

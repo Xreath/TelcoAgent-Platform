@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: telco-customer-service
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "telco-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/name: customer-service
+spec:
+  replicas: {{ .Values.customerService.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: customer-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: customer-service
+    spec:
+      containers:
+        - name: customer-service
+          image: "{{ .Values.customerService.image.repository }}:{{ .Values.customerService.image.tag }}"
+          imagePullPolicy: {{ .Values.customerService.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.customerService.port }}
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: telco-agent-config
+            - secretRef:
+                name: telco-agent-secrets
+          resources:
+            {{- toYaml .Values.customerService.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.customerService.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.customerService.port }}
+            initialDelaySeconds: 15
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: telco-customer-service
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "telco-agent.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.customerService.port }}
+      targetPort: {{ .Values.customerService.port }}
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: customer-service

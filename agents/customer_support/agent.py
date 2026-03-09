@@ -34,6 +34,7 @@ from agents.customer_support.memory import RedisMemory
 from agents.customer_support.metrics import AgentMetrics
 from agents.customer_support.tools import ALL_TOOLS
 from shared.config.settings import get_settings
+from shared.security import PromptInjectionError, sanitize_input
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -146,6 +147,21 @@ class CustomerSupportAgentRunner:
             complaint_type=complaint_type,
             priority=priority,
         )
+
+        # Sanitize user-controlled input against prompt injection
+        try:
+            description = sanitize_input(description, field_name="complaint_description")
+        except PromptInjectionError as e:
+            logger.error("Prompt injection in complaint from customer %s: %s", customer_id, e)
+            self._metrics.track_error("prompt_injection_blocked")
+            return {
+                "session_id": session_id,
+                "customer_id": customer_id,
+                "complaint_type": complaint_type,
+                "priority": priority,
+                "response": "Şikayet içeriği güvenlik kontrolünden geçemedi. Lütfen geçerli bir açıklama girin.",
+                "message_count": 0,
+            }
 
         # Build the complaint message for the agent
         complaint_message = (
