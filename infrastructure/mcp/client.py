@@ -29,6 +29,8 @@ logger = logging.getLogger(__name__)
 MCP_SERVER_REGISTRY: dict[str, str] = {
     "customer": "infrastructure.mcp.customer_mcp_server",
     "billing": "infrastructure.mcp.billing_mcp_server",
+    "network": "infrastructure.mcp.network_mcp_server",
+    "campaign": "infrastructure.mcp.campaign_mcp_server",
 }
 
 

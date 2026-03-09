@@ -70,6 +70,8 @@ class Settings(BaseSettings):
     # Service URLs
     customer_service_url: str = "http://localhost:8001/v1/customers"
     billing_service_url: str = "http://localhost:8002/v1/billing"
+    network_service_url: str = "http://localhost:8003/v1/network"
+    campaign_service_url: str = "http://localhost:8004/v1/campaigns"
 
     # Observability
     jaeger_endpoint: str = "http://localhost:14268/api/traces"

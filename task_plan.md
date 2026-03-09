@@ -4,7 +4,7 @@
 Telekom operatoru icin enterprise-scale agentic AI platformu gelistirmek. DDD, LangGraph/AutoGen multi-agent, Kafka event-driven, MCP, LLM operationalization, Kubernetes — tum stack'i egitim projesi olarak insa etmek.
 
 ## Current Phase
-Phase 5
+Phase 6
 
 ## Phases
 
@@ -47,14 +47,18 @@ Phase 5
 - **Deliverable:** Yeni tool ekleme agent restart gerektirmez
 
 ### Phase 5: Multi-Agent Orchestration (Week 5)
-- [ ] LangGraph Supervisor agent (routing)
-- [ ] NetworkDiagnosticAgent (AutoGen Group Chat)
-- [ ] BillingAnalystAgent (LangGraph + Structured Output)
-- [ ] CampaignAgent (LangGraph + Fine-tuned LLM + A/B)
-- [ ] Agent-to-agent comms via Kafka
-- [ ] LangGraph conditional edges
-- [ ] Long-term memory entegrasyonu (pgvector — solution embeddings, agent'a RAG)
-- **Status:** pending
+- [x] LangGraph Supervisor agent (routing)
+- [x] NetworkDiagnosticAgent (LangGraph ReAct — Group Chat simülasyonu prompt ile)
+- [x] BillingAnalystAgent (LangGraph + Structured Output)
+- [x] CampaignAgent (LangGraph + A/B variant generation)
+- [x] Agent-to-agent comms via Kafka (OrchestratorConsumer multi-topic → supervisor graph)
+- [x] LangGraph conditional edges (supervisor → 4 specialist routing)
+- [x] Long-term memory entegrasyonu (pgvector — solution embeddings, RAG)
+- [x] Network Domain Service (full DDD stack: model, repository, CQRS, API)
+- [x] Campaign Domain Service (full DDD stack: model, repository, CQRS, API)
+- [x] Network MCP Server (6 tool: topology, metrics, diagnostic, escalate, affected_customers)
+- [x] Campaign MCP Server (6 tool: segment, generate_text, log_ab, list, variant_performance)
+- **Status:** complete
 - **Deliverable:** Billing+network iceren complaint dogru agentlara yonlendirilir
 
 ### Phase 6: Workflows & Streaming (Week 6)
