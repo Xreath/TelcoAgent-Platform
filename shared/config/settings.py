@@ -13,6 +13,9 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    # Local Dev
+    dev_mode: bool = False
+
     # PostgreSQL
     postgres_host: str = "localhost"
     postgres_port: int = 5432

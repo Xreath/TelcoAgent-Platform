@@ -33,7 +33,7 @@ from shared.config.settings import get_settings
 
 logger = structlog.get_logger(__name__)
 
-_security = HTTPBearer(auto_error=True)
+_security = HTTPBearer(auto_error=False)
 
 # JWKS cache
 _jwks_cache: dict[str, Any] = {}
@@ -113,7 +113,7 @@ def _extract_roles(payload: dict[str, Any]) -> list[str]:
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(_security),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_security),
 ) -> TokenPayload:
     """FastAPI dependency — validates JWT and returns user info.
 
@@ -122,6 +122,22 @@ async def get_current_user(
         async def me(user: TokenPayload = Depends(get_current_user)):
             return user
     """
+    settings = get_settings()
+
+    if settings.dev_mode:
+        return TokenPayload(
+            sub="dev-user-id",
+            preferred_username="dev-admin",
+            roles=["agent-operator", "agent-supervisor"],
+        )
+
+    if not credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     jwks = await _get_jwks()
     payload = _decode_token(credentials.credentials, jwks)
 
@@ -149,6 +165,10 @@ def require_role(role: str):
     async def _check_role(
         user: TokenPayload = Depends(get_current_user),
     ) -> TokenPayload:
+        settings = get_settings()
+        if settings.dev_mode:
+            return user
+
         if role not in user.roles:
             logger.warning(
                 "insufficient_role",

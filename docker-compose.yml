@@ -107,6 +107,7 @@ services:
       POSTGRES_PASSWORD: telco_secret
       POSTGRES_DB: telcoagent
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      DEV_MODE: ${DEV_MODE:-false}
     ports:
       - "8001:8001"
     depends_on:
@@ -130,6 +131,7 @@ services:
       POSTGRES_PASSWORD: telco_secret
       POSTGRES_DB: telcoagent
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      DEV_MODE: ${DEV_MODE:-false}
     ports:
       - "8002:8002"
     depends_on:
@@ -291,7 +293,7 @@ services:
 
   # ── Jaeger ─────────────────────────────────────────────────
   jaeger:
-    image: jaegertracing/all-in-one:1.62
+    image: jaegertracing/all-in-one:latest
     container_name: telco-jaeger
     environment:
       COLLECTOR_OTLP_ENABLED: "true"

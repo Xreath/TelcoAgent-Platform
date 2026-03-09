@@ -21,20 +21,25 @@ scrape_configs:
 
   # Domain services
   - job_name: "customer-service"
+    metrics_path: "/metrics"
     static_configs:
       - targets: ["customer-service:8001"]
 
   - job_name: "billing-service"
+    metrics_path: "/metrics"
     static_configs:
       - targets: ["billing-service:8002"]
 
   - job_name: "network-service"
+    metrics_path: "/metrics"
     static_configs:
       - targets: ["network-service:8003"]
 
   - job_name: "campaign-service"
+    metrics_path: "/metrics"
     static_configs:
       - targets: ["campaign-service:8004"]
+
 
   # Agent services
   - job_name: "customer-support-agent"

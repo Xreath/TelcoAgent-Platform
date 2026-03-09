@@ -1,21 +1,22 @@
-"""Mock data seeder — populates DB with realistic fake telecom data.
-
-Uses Faker to generate Turkish telecom customer profiles, invoices,
-network nodes, and complaints. Run once after docker compose up.
-
-Usage:
-    python scripts/seed_mock_data.py
-"""
-
 import asyncio
 import random
+import uuid
+import sys
+import os
 
 from faker import Faker
 
+# Add project root to sys.path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+
+from shared.utils.database import engine, Base
+from services.customer.infrastructure.orm_models import CustomerORM, ComplaintORM
+from services.billing.infrastructure.orm_models import InvoiceORM
+
 fake = Faker("tr_TR")
-
-
-# ── Mock customer data ─────────────────────────────────────
 
 SEGMENTS = ["platinum", "gold", "silver", "bronze", "new", "churning"]
 PLANS = ["prepaid_basic", "prepaid_premium", "postpaid_starter", "postpaid_business", "fiber_home"]
@@ -35,7 +36,6 @@ MOCK_COMPLAINTS = [
     "Kota bitmiş gösteriyor ama kullanmadım.",
 ]
 
-
 def generate_customers(count: int = 50) -> list[dict]:
     customers = []
     for _ in range(count):
@@ -51,18 +51,19 @@ def generate_customers(count: int = 50) -> list[dict]:
 
         customers.append(
             {
+                "id": uuid.uuid4(),
                 "name": fake.name(),
                 "phone_number": f"5{random.randint(30, 59)}{fake.numerify('######')}",
                 "email": fake.email(),
                 "segment": segment,
                 "subscription_plan": random.choice(PLANS),
                 "clv_score": round(clv, 2),
+                "is_active": True,
             }
         )
     return customers
 
-
-def generate_invoices(customer_ids: list[str], months: int = 3) -> list[dict]:
+def generate_invoices(customer_ids: list[uuid.UUID], months: int = 3) -> list[dict]:
     invoices = []
     current_year = 2026
     for cid in customer_ids:
@@ -76,6 +77,7 @@ def generate_invoices(customer_ids: list[str], months: int = 3) -> list[dict]:
             base = random.uniform(50, 500)
             invoices.append(
                 {
+                    "id": uuid.uuid4(),
                     "customer_id": cid,
                     "period_year": year,
                     "period_month": month,
@@ -91,16 +93,15 @@ def generate_invoices(customer_ids: list[str], months: int = 3) -> list[dict]:
             )
     return invoices
 
-
-def generate_complaints(customer_ids: list[str]) -> list[dict]:
+def generate_complaints(customer_ids: list[uuid.UUID]) -> list[dict]:
     complaints = []
-    # ~30% of customers have at least one complaint
     complainers = random.sample(customer_ids, k=int(len(customer_ids) * 0.3))
     for cid in complainers:
         num_complaints = random.randint(1, 3)
         for _ in range(num_complaints):
             complaints.append(
                 {
+                    "id": uuid.uuid4(),
                     "customer_id": cid,
                     "complaint_type": random.choice(COMPLAINT_TYPES),
                     "description": random.choice(MOCK_COMPLAINTS),
@@ -110,57 +111,44 @@ def generate_complaints(customer_ids: list[str]) -> list[dict]:
             )
     return complaints
 
-
-def generate_network_nodes(count: int = 20) -> list[dict]:
-    cities = ["Istanbul", "Ankara", "Izmir", "Bursa", "Antalya", "Adana", "Konya", "Gaziantep"]
-    node_types = ["base_station", "fiber_node", "switch", "router"]
-    statuses = ["active", "active", "active", "degraded", "down"]
-
-    nodes = []
-    for i in range(count):
-        city = random.choice(cities)
-        nodes.append(
-            {
-                "node_id": f"NODE-{city[:3].upper()}-{i:03d}",
-                "node_type": random.choice(node_types),
-                "city": city,
-                "status": random.choice(statuses),
-                "latitude": round(random.uniform(36.0, 42.0), 6),
-                "longitude": round(random.uniform(26.0, 44.0), 6),
-                "connected_customers": random.randint(50, 5000),
-            }
-        )
-    return nodes
-
-
 async def seed():
-    """Main seed function — generates and prints mock data summary."""
-    print("Generating mock data...")
+    print("Connecting to database to seed mock data...")
 
-    customers = generate_customers(50)
-    print(f"  Customers:     {len(customers)}")
+    async with engine.begin() as conn:
+        # Create tables if they don't exist
+        await conn.run_sync(Base.metadata.create_all)
 
-    # Use fake UUIDs for demo (real seeding would use actual DB IDs)
-    import uuid
+    async with AsyncSession(engine) as session:
+        # Check if already seeded
+        result = await session.execute(select(CustomerORM).limit(1))
+        if result.scalar_one_or_none() is not None:
+            print("Database already contains data. Skipping seed.")
+            return
 
-    fake_ids = [str(uuid.uuid4()) for _ in customers]
+        print("Generating mock data...")
+        customers_data = generate_customers(50)
+        customer_orms = [CustomerORM(**c) for c in customers_data]
+        session.add_all(customer_orms)
+        await session.flush()
 
-    invoices = generate_invoices(fake_ids, months=3)
-    print(f"  Invoices:      {len(invoices)}")
+        customer_ids = [c.id for c in customer_orms]
 
-    complaints = generate_complaints(fake_ids)
-    print(f"  Complaints:    {len(complaints)}")
+        invoices_data = generate_invoices(customer_ids, months=3)
+        invoice_orms = [InvoiceORM(**i) for i in invoices_data]
+        session.add_all(invoice_orms)
 
-    nodes = generate_network_nodes(20)
-    print(f"  Network nodes: {len(nodes)}")
+        complaints_data = generate_complaints(customer_ids)
+        complaint_orms = [ComplaintORM(**c) for c in complaints_data]
+        session.add_all(complaint_orms)
 
-    print("\nMock data generation complete.")
-    print("To seed the database, integrate with FastAPI startup or run via Alembic seed.")
-    print("\nSample customer:")
-    import json
+        await session.commit()
 
-    print(json.dumps(customers[0], indent=2, ensure_ascii=False))
+        print(f"Data seeded successfully:")
+        print(f"  Customers:     {len(customer_orms)}")
+        print(f"  Invoices:      {len(invoice_orms)}")
+        print(f"  Complaints:    {len(complaint_orms)}")
 
+    await engine.dispose()
 
 if __name__ == "__main__":
     asyncio.run(seed())
