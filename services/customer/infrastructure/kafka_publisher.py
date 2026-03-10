@@ -32,7 +32,7 @@ class OutboxRepository:
                 INSERT INTO outbox.events
                     (id, aggregate_type, aggregate_id, event_type, payload)
                 VALUES
-                    (:id, :aggregate_type, :aggregate_id, :event_type, :payload::jsonb)
+                    (:id, :aggregate_type, :aggregate_id, :event_type, cast(:payload as jsonb))
             """),
             {
                 "id": str(uuid.uuid4()),
