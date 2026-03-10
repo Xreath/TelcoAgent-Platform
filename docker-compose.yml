@@ -142,6 +142,54 @@ services:
     networks:
       - telco-net
 
+  # ── Network Service ────────────────────────────────────────
+  network-service:
+    build:
+      context: .
+      dockerfile: services/network/Dockerfile
+    container_name: telco-network-service
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: telco
+      POSTGRES_PASSWORD: telco_secret
+      POSTGRES_DB: telcoagent
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      DEV_MODE: ${DEV_MODE:-false}
+    ports:
+      - "8003:8003"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - telco-net
+
+  # ── Campaign Service ────────────────────────────────────────
+  campaign-service:
+    build:
+      context: .
+      dockerfile: services/campaign/Dockerfile
+    container_name: telco-campaign-service
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: telco
+      POSTGRES_PASSWORD: telco_secret
+      POSTGRES_DB: telcoagent
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      DEV_MODE: ${DEV_MODE:-false}
+    ports:
+      - "8004:8004"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - telco-net
+
   # ── Kafka UI ───────────────────────────────────────────────
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
@@ -154,29 +202,6 @@ services:
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
     ports:
       - "8082:8080"
-    networks:
-      - telco-net
-
-  # ── Keycloak ───────────────────────────────────────────────
-  keycloak:
-    image: quay.io/keycloak/keycloak:26.0
-    container_name: telco-keycloak
-    command: start-dev --import-realm
-    environment:
-      KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://postgres:5432/telcoagent
-      KC_DB_USERNAME: telco
-      KC_DB_PASSWORD: telco_secret
-      KC_DB_SCHEMA: keycloak
-      KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: admin
-    ports:
-      - "8080:8080"
-    volumes:
-      - ./infrastructure/keycloak:/opt/keycloak/data/import
-    depends_on:
-      postgres:
-        condition: service_healthy
     networks:
       - telco-net
 
@@ -197,6 +222,7 @@ services:
       LANGCHAIN_TRACING_V2: "true"
       LANGCHAIN_API_KEY: ${LANGCHAIN_API_KEY:-your-langsmith-key}
       LANGCHAIN_PROJECT: telco-agent-platform
+      LANGCHAIN_ENDPOINT: ${LANGCHAIN_ENDPOINT:-https://api.smith.langchain.com}
     ports:
       - "8010:8010"
     depends_on:
@@ -280,31 +306,6 @@ services:
     networks:
       - telco-net
 
-  # ── Loki ───────────────────────────────────────────────────
-  loki:
-    image: grafana/loki:3.2.1
-    container_name: telco-loki
-    ports:
-      - "3100:3100"
-    volumes:
-      - loki_data:/loki
-    networks:
-      - telco-net
-
-  # ── Jaeger ─────────────────────────────────────────────────
-  jaeger:
-    image: jaegertracing/all-in-one:latest
-    container_name: telco-jaeger
-    environment:
-      COLLECTOR_OTLP_ENABLED: "true"
-    ports:
-      - "16686:16686"  # Jaeger UI
-      - "14268:14268"  # HTTP collector
-      - "4317:4317"    # OTLP gRPC
-      - "4318:4318"    # OTLP HTTP
-    networks:
-      - telco-net
-
 # ── Volumes ──────────────────────────────────────────────────
 volumes:
   postgres_data:
@@ -314,7 +315,6 @@ volumes:
   kafka_data:
   prometheus_data:
   grafana_data:
-  loki_data:
 
 # ── Network ──────────────────────────────────────────────────
 networks:

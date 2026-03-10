@@ -1,7 +1,7 @@
-"""OAuth2.0 JWT token validation middleware for FastAPI.
+"""Simple JWT token validation middleware for FastAPI.
 
-Validates tokens issued by Keycloak using JWKS (JSON Web Key Set).
-Supports role-based access control via realm_access.roles claim.
+Self-contained JWT authentication — no external identity provider needed.
+Tokens are signed with a symmetric secret (HS256).
 
 Usage in routes:
     from shared.auth import get_current_user, require_role, TokenPayload
@@ -19,10 +19,8 @@ Usage in routes:
 
 from __future__ import annotations
 
-import time
-from typing import Any
+from datetime import datetime, timedelta, timezone
 
-import httpx
 import structlog
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -35,11 +33,6 @@ logger = structlog.get_logger(__name__)
 
 _security = HTTPBearer(auto_error=False)
 
-# JWKS cache
-_jwks_cache: dict[str, Any] = {}
-_jwks_cache_expiry: float = 0.0
-_JWKS_CACHE_TTL = 300  # 5 minutes
-
 
 class TokenPayload(BaseModel):
     """Decoded JWT token payload."""
@@ -48,52 +41,39 @@ class TokenPayload(BaseModel):
     preferred_username: str = ""
     email: str = ""
     roles: list[str] = []
-    client_id: str = ""
-    scope: str = ""
     exp: int = 0
-    iss: str = ""
 
 
-async def _get_jwks() -> dict[str, Any]:
-    """Fetch and cache JWKS from Keycloak."""
-    global _jwks_cache, _jwks_cache_expiry
-
-    if _jwks_cache and time.time() < _jwks_cache_expiry:
-        return _jwks_cache
-
+def create_access_token(
+    sub: str,
+    username: str = "",
+    email: str = "",
+    roles: list[str] | None = None,
+    expires_delta: timedelta | None = None,
+) -> str:
+    """Create a signed JWT access token."""
     settings = get_settings()
-    jwks_url = f"{settings.keycloak_url}/realms/{settings.keycloak_realm}/protocol/openid-connect/certs"
+    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=settings.jwt_expire_minutes))
+
+    payload = {
+        "sub": sub,
+        "preferred_username": username,
+        "email": email,
+        "roles": roles or [],
+        "exp": expire,
+    }
+    return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+
+
+def _decode_token(token: str) -> dict:
+    """Decode and validate a JWT token."""
+    settings = get_settings()
 
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(jwks_url)
-            response.raise_for_status()
-            _jwks_cache = response.json()
-            _jwks_cache_expiry = time.time() + _JWKS_CACHE_TTL
-            return _jwks_cache
-    except httpx.HTTPError:
-        logger.exception("jwks_fetch_failed", url=jwks_url)
-        if _jwks_cache:
-            logger.warning("using_stale_jwks_cache")
-            return _jwks_cache
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Authentication service unavailable",
-        )
-
-
-def _decode_token(token: str, jwks: dict[str, Any]) -> dict[str, Any]:
-    """Decode and validate a JWT token using JWKS."""
-    settings = get_settings()
-    issuer = f"{settings.keycloak_url}/realms/{settings.keycloak_realm}"
-
-    try:
-        payload = jwt.decode(
+        payload: dict = jwt.decode(
             token,
-            jwks,
-            algorithms=["RS256"],
-            audience="account",
-            issuer=issuer,
+            settings.jwt_secret_key,
+            algorithms=[settings.jwt_algorithm],
             options={"verify_exp": True},
         )
         return payload
@@ -104,12 +84,6 @@ def _decode_token(token: str, jwks: dict[str, Any]) -> dict[str, Any]:
             detail=f"Invalid token: {e}",
             headers={"WWW-Authenticate": "Bearer"},
         )
-
-
-def _extract_roles(payload: dict[str, Any]) -> list[str]:
-    """Extract realm roles from Keycloak token payload."""
-    realm_access = payload.get("realm_access", {})
-    return realm_access.get("roles", [])
 
 
 async def get_current_user(
@@ -138,23 +112,19 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    jwks = await _get_jwks()
-    payload = _decode_token(credentials.credentials, jwks)
+    payload = _decode_token(credentials.credentials)
 
     return TokenPayload(
         sub=payload.get("sub", ""),
         preferred_username=payload.get("preferred_username", ""),
         email=payload.get("email", ""),
-        roles=_extract_roles(payload),
-        client_id=payload.get("azp", ""),
-        scope=payload.get("scope", ""),
+        roles=payload.get("roles", []),
         exp=payload.get("exp", 0),
-        iss=payload.get("iss", ""),
     )
 
 
 def require_role(role: str):
-    """FastAPI dependency factory — requires a specific Keycloak realm role.
+    """FastAPI dependency factory — requires a specific role.
 
     Usage:
         @router.delete("/admin-only")

@@ -18,9 +18,6 @@ CREATE SCHEMA IF NOT EXISTS campaign;
 -- Outbox schema (shared pattern)
 CREATE SCHEMA IF NOT EXISTS outbox;
 
--- Keycloak schema
-CREATE SCHEMA IF NOT EXISTS keycloak;
-
 -- ============================================================
 -- Outbox table (used by all domain services)
 -- ============================================================

@@ -27,7 +27,6 @@ customerService:
     POSTGRES_HOST: telco-postgres
     REDIS_HOST: telco-redis
     KAFKA_BOOTSTRAP_SERVERS: telco-kafka:9092
-    KEYCLOAK_URL: http://telco-keycloak:8080
 
 billingService:
   replicaCount: 2
@@ -136,16 +135,6 @@ kafka:
     repository: confluentinc/cp-kafka
     tag: "7.7.1"
   port: 9092
-
-keycloak:
-  enabled: true
-  image:
-    repository: quay.io/keycloak/keycloak
-    tag: "26.0"
-  port: 8080
-  admin:
-    username: admin
-    password: admin
 
 prometheus:
   enabled: true

@@ -1,5 +1,5 @@
-"""Shared authentication — Keycloak OAuth2.0 JWT validation."""
+"""Shared authentication — Simple JWT validation."""
 
-from shared.auth.middleware import get_current_user, require_role, TokenPayload
+from shared.auth.middleware import TokenPayload, create_access_token, get_current_user, require_role
 
-__all__ = ["get_current_user", "require_role", "TokenPayload"]
+__all__ = ["get_current_user", "require_role", "TokenPayload", "create_access_token"]

@@ -41,11 +41,10 @@ class Settings(BaseSettings):
     # Kafka
     kafka_bootstrap_servers: str = "localhost:9092"
 
-    # Keycloak
-    keycloak_url: str = "http://localhost:8080"
-    keycloak_realm: str = "telco-agents"
-    keycloak_client_id: str = "customer-service"
-    keycloak_client_secret: str = "change-me"
+    # JWT Auth
+    jwt_secret_key: str = "change-me-in-production"
+    jwt_algorithm: str = "HS256"
+    jwt_expire_minutes: int = 60
 
     # LLM (DeepSeek — OpenAI compatible)
     openai_api_base: str = "https://api.deepseek.com/v1"
@@ -62,8 +61,6 @@ class Settings(BaseSettings):
     network_service_url: str = "http://localhost:8003/v1/network"
     campaign_service_url: str = "http://localhost:8004/v1/campaigns"
 
-    # Observability
-    jaeger_endpoint: str = "http://localhost:14268/api/traces"
 
 
 @lru_cache

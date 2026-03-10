@@ -17,8 +17,9 @@ Tek projede her şeyi kullanmaya çalışmak:
 
 ---
 
-## Proje 1: TelcoAgent Platform (Mevcut — Bitmek Üzere)
+## Proje 1: TelcoAgent Platform (Tamamlandı)
 
+**Durum:** TelcoAgent projesi bitti.
 **Repo:** `TelcoAgentPlatform`
 **Odak:** DDD + Agentic AI + Kafka + MCP
 
@@ -36,11 +37,9 @@ Tek projede her şeyi kullanmaya çalışmak:
 - Multi-agent orchestration (Supervisor → routing → 4 agent)
 - 4 MCP server (Customer, Billing, Network, Campaign)
 - Shared base classes (AggregateRoot, DomainEvent, ValueObject)
-
-### Kalan (sadeleştirilmiş)
 - DLQ stratejisi
 - Prometheus/Grafana bağlantısı
-- OAuth2.0 middleware (Keycloak)
+- Simple JWT auth middleware (HS256)
 - Basit Helm chart
 - ADR'ler + API docs
 
@@ -285,7 +284,7 @@ Izole bir lab ortamında her bileşeni ayrı ayrı ekleyerek öğrenmek çok dah
 ## Proje 5: ResearchAgentLab
 
 **Repo:** `ResearchAgentLab` (oluşturulacak)
-**Odak:** AutoGen + Qdrant + MongoDB + Kafka Streams + Schema Registry + WebSocket + Observability
+**Odak:** AutoGen + Qdrant + MongoDB + Kafka Streams + Schema Registry + WebSocket
 
 > TelcoAgent'tan çıkarılan teknolojilerin doğal bir senaryo içinde öğrenildiği proje.
 
@@ -317,10 +316,6 @@ web'den bilgi toplar, kod çalıştırır → sonuçları real-time olarak kulla
 │  MongoDB                                    │
 │  Research sessions, agent traces, results   │
 └─────────────────────────────────────────────┘
-       │
-┌──────▼──────────────────────────────────────┐
-│  Observability: Loki (logs) + Jaeger (traces)│
-└─────────────────────────────────────────────┘
 ```
 
 ### Ne öğretir?
@@ -333,8 +328,6 @@ web'den bilgi toplar, kod çalıştırır → sonuçları real-time olarak kulla
 | **Kafka + Faust** | Real-time doküman ingestion — yeni kaynak eklenince otomatik embedding + indexleme |
 | **Schema Registry (Avro)** | Kafka mesaj şema yönetimi — Faust stream'leri typed, schema evolution test edilir |
 | **WebSocket** | Kullanıcıya agent'ların düşünme sürecini real-time aktarma (streaming) |
-| **Loki** | Tüm agent log'larının merkezi toplanması, Grafana'da sorgulanması |
-| **Jaeger** | Agent → tool → DB arası distributed tracing, bottleneck tespiti |
 
 ### Neden bu teknolojiler burada doğal?
 
@@ -343,7 +336,6 @@ web'den bilgi toplar, kod çalıştırır → sonuçları real-time olarak kulla
 - **MongoDB vs PostgreSQL:** Araştırma sonuçları şemasız, iç içe, değişken yapıda — tam MongoDB use case'i.
 - **Kafka Streams + Schema Registry:** Yeni doküman eklendikçe real-time embedding pipeline. Schema Registry sayesinde mesaj formatı değiştiğinde consumer'lar kırılmaz.
 - **WebSocket:** Agent'lar düşünürken kullanıcı beklemek zorunda kalmamalı — canlı akış.
-- **Loki + Jaeger:** Birden fazla agent + tool + DB olan bir sistemde log ve trace olmadan debug imkansız.
 
 ### Mülakatta Anlatılacak Kararlar
 | Soru | Cevap |
@@ -407,15 +399,198 @@ sonucu raporlar. Multi-turn conversation ile iteratif çalışır.
 
 ---
 
+## Proje 7: IdentityLab
+
+**Repo:** `IdentityLab` (oluşturulacak)
+**Odak:** Enterprise Identity & Access Management — Keycloak, OAuth2/OIDC, RBAC, MFA
+
+> TelcoAgent'ta Keycloak overengineering'di — basit JWT yetti. Ama enterprise ortamda
+> identity management kritik bir konu. Bu projede Keycloak'ı gerçekten ihtiyaç duyulan
+> bir senaryoda derinlemesine öğreniyorsun.
+
+### Senaryo: Multi-Tenant SaaS Kimlik Platformu
+
+Bir SaaS uygulaması: birden fazla şirket (tenant) aynı platformu kullanıyor. Her tenant'ın
+kendi kullanıcıları, rolleri ve izinleri var. Social login (Google, GitHub), MFA zorunluluğu,
+ve API gateway üzerinden token validasyonu gerekiyor.
+
+### Mimari
+
+```
+┌──────────────────────────────────────────────────────┐
+│  React Frontend (admin-ui)                           │
+│  Login → Keycloak hosted login page (OIDC)           │
+│  Token refresh, silent SSO, logout                   │
+└──────────────┬───────────────────────────────────────┘
+               │ Bearer Token
+┌──────────────▼───────────────────────────────────────┐
+│  Kong / Traefik API Gateway                          │
+│  OIDC plugin → Keycloak token introspection          │
+│  Rate limiting per tenant                            │
+└──────────────┬───────────────────────────────────────┘
+               │
+┌──────────────▼───────────────────────────────────────┐
+│  FastAPI — Tenant Management API                     │
+│  POST /tenants → yeni tenant (Keycloak realm/group)  │
+│  GET  /users   → tenant-scoped kullanıcı listesi     │
+│  PUT  /roles   → RBAC yönetimi                       │
+└──────────────┬───────────────────────────────────────┘
+               │
+┌──────────────▼───────────────────────────────────────┐
+│  Keycloak (Docker)                                   │
+│  ├── Realm per tenant (veya single realm + groups)   │
+│  ├── Identity Providers: Google, GitHub (social)     │
+│  ├── MFA: TOTP + WebAuthn                            │
+│  ├── Client Scopes: fine-grained permissions         │
+│  ├── User Federation: LDAP bağlantısı (mock)         │
+│  └── Admin REST API: programmatik yönetim            │
+└──────────────┬───────────────────────────────────────┘
+               │
+┌──────────────▼───────────────────────────────────────┐
+│  PostgreSQL — Keycloak + uygulama verisi             │
+└──────────────────────────────────────────────────────┘
+```
+
+### Ne öğretir?
+
+| Kavram | Bu Projede Nasıl Öğrenilir |
+|---|---|
+| **OAuth2 Flows** | Authorization Code + PKCE (frontend), Client Credentials (service-to-service) |
+| **OIDC** | ID Token vs Access Token farkı, UserInfo endpoint, JWKS validation |
+| **Multi-tenancy** | Realm-per-tenant vs single-realm-with-groups — trade-off'ları yaşayarak öğren |
+| **RBAC** | Realm roles, client roles, composite roles — granüler izin modeli |
+| **Social Login** | Google/GitHub identity provider entegrasyonu, account linking |
+| **MFA** | TOTP setup flow, WebAuthn (passkeys), conditional MFA (admin-only) |
+| **Token Management** | Access token lifetime, refresh token rotation, token revocation |
+| **API Gateway + OIDC** | Kong/Traefik OIDC plugin ile gateway seviyesinde token validation |
+| **Admin API** | Keycloak REST API ile programmatik realm/user/role yönetimi |
+| **User Federation** | LDAP/Active Directory entegrasyonu (mock LDAP ile) |
+
+### Mülakatta Anlatılacak Kararlar
+| Soru | Cevap |
+|------|-------|
+| Neden Keycloak (Auth0/Firebase Auth değil)? | Self-hosted, tam kontrol. Enterprise'da data sovereignty kritik. Auth0 SaaS — vendor lock-in riski. |
+| Realm-per-tenant mi, single realm mi? | Realm-per-tenant: tam izolasyon ama yönetim overhead'i fazla. Single realm + groups: daha kolay ama cross-tenant risk. Senaryoya göre seçim. |
+| MFA neden zorunlu değil? | Conditional — sadece admin role'ü olanlar için. UX ile güvenlik dengesi. |
+| PKCE neden? | Public client (SPA) için Authorization Code tek başına güvensiz — PKCE code interception attack'ı önler. |
+
+### Neden ayrı proje?
+TelcoAgent'ta Keycloak overengineering'di çünkü tek bir internal servis grubuydu —
+simple JWT yeterdi. Bu projede ise multi-tenant, social login, MFA gibi gerçek
+enterprise identity sorunları var — Keycloak burada doğru araç.
+
+---
+
+## Proje 8: ObservabilityLab
+
+**Repo:** `ObservabilityLab` (oluşturulacak)
+**Odak:** Distributed Observability — OpenTelemetry, Jaeger, Loki, Grafana Tempo
+
+> TelcoAgent'ta Jaeger ve Loki sadece docker-compose'da duruyordu, gerçek instrumentation
+> yoktu. Bu projede OpenTelemetry SDK ile gerçek distributed tracing ve log correlation
+> yaparak observability'yi derinlemesine öğreniyorsun.
+
+### Senaryo: Microservice Observability Platform
+
+3 microservice'ten oluşan bir e-ticaret backend'i: Order → Payment → Notification.
+Her servis OpenTelemetry ile instrument edilmiş. Bir istek geldiğinde trace ID tüm
+servislerde takip ediliyor, loglar trace ile correlate ediliyor, metrikler
+otomatik toplanıyor. Sorun olunca Grafana'da tek ekrandan trace + log + metric birlikte görülüyor.
+
+### Mimari
+
+```
+┌──────────────────────────────────────────────────────┐
+│  Load Generator (Locust)                             │
+│  Farklı senaryolar: normal, yavaş, hatalı           │
+└──────────────┬───────────────────────────────────────┘
+               │
+┌──────────────▼───────────────────────────────────────┐
+│  Order Service (FastAPI)                             │
+│  OTel auto-instrumentation                           │
+│  → Payment Service çağırır (HTTP)                    │
+│  → Notification Service'e event gönderir (Kafka)     │
+└──────┬───────────────────────┬───────────────────────┘
+       │ HTTP                  │ Kafka
+┌──────▼──────┐         ┌──────▼──────┐
+│  Payment    │         │  Notific.   │
+│  Service    │         │  Service    │
+│  (FastAPI)  │         │  (FastAPI)  │
+│  OTel instr.│         │  OTel instr.│
+└──────┬──────┘         └──────┬──────┘
+       │                       │
+┌──────▼───────────────────────▼───────────────────────┐
+│  OpenTelemetry Collector (OTLP)                      │
+│  Receives traces, metrics, logs from all services    │
+│  Exports to multiple backends                        │
+└──────┬───────────────┬───────────────┬───────────────┘
+       │               │               │
+┌──────▼──────┐ ┌──────▼──────┐ ┌──────▼──────┐
+│  Jaeger     │ │  Loki       │ │  Prometheus │
+│  (traces)   │ │  (logs)     │ │  (metrics)  │
+└──────┬──────┘ └──────┬──────┘ └──────┬──────┘
+       │               │               │
+┌──────▼───────────────▼───────────────▼───────────────┐
+│  Grafana                                             │
+│  Unified dashboard: Traces ↔ Logs ↔ Metrics          │
+│  Trace → log correlation (traceID ile)               │
+│  Alerting: latency p99 > 500ms, error rate > 5%      │
+└──────────────────────────────────────────────────────┘
+```
+
+### Ne öğretir?
+
+| Kavram | Bu Projede Nasıl Öğrenilir |
+|---|---|
+| **OpenTelemetry SDK** | Auto + manual instrumentation — span oluşturma, attribute ekleme, context propagation |
+| **Distributed Tracing** | Trace ID bir servisten diğerine geçiyor — tüm call chain tek trace'de görünüyor |
+| **OTel Collector** | Merkezi toplama noktası — receiver, processor, exporter pipeline'ı |
+| **Jaeger** | Trace UI — waterfall view, service dependency graph, latency histogram |
+| **Loki** | Structured logging — label bazlı sorgu, traceID ile log-trace correlation |
+| **Log-Trace Correlation** | Log'a traceID inject et → Grafana'da log'dan trace'e, trace'den log'a tek tıkla geç |
+| **Prometheus + OTel** | OTel metrics → Prometheus exporter → Grafana dashboard |
+| **Custom Spans** | Business-level tracing — "ödeme işlemi", "stok kontrolü" gibi anlamlı span'ler |
+| **Baggage / Context** | W3C Trace Context, baggage propagation (user_id, tenant_id taşıma) |
+| **Sampling** | Head-based vs tail-based sampling — production'da trace volume kontrolü |
+
+### Mülakatta Anlatılacak Kararlar
+| Soru | Cevap |
+|------|-------|
+| Neden OTel (vendor SDK değil)? | Vendor-agnostic. Jaeger'dan Tempo'ya geçsen bile kod değişmez. |
+| Jaeger vs Grafana Tempo? | Jaeger: standalone, kolay kurulum. Tempo: Grafana native, object storage backend, daha scalable. Her ikisini de deneyimlemek lazım. |
+| Log-trace correlation neden önemli? | "500 Internal Server Error" gördüğünde trace'e bakıp hangi servisin hangi adımda patladığını anında bulursun. |
+| Sampling neden? | Production'da her isteği trace'lemek çok pahalı. %10 head-based + hatalı istekleri %100 tail-based sampling ideal denge. |
+
+### Neden ayrı proje?
+TelcoAgent'ta Jaeger ve Loki docker-compose'da vardı ama hiçbir serviste gerçek
+OpenTelemetry instrumentation yoktu — sadece infra kurulmuştu. Observability
+gerçekten öğrenmek için instrument edilmiş servisler, real trace flow ve
+log correlation lazım. Bu ancak odaklanmış bir projede olur.
+
+---
+
+## Opsiyonel Bir proje
+Odak: Production-grade RAG Pipeline
+├── Advanced Chunking (semantic, recursive, agentic)
+├── Hybrid Search (vector + BM25 + metadata filtering)
+├── Re-ranking (Cross-Encoder, LLM-based)
+├── Query Transformation (HyDE, step-back prompting)
+├── Evaluation Framework (RAGAS, TruLens)
+└── Caching Layer (semantic cache with Redis)
+
 ## Öğrenme Sırası Önerisi
 
 ```
-TelcoAgent (bitir) → TemporalLab → ResearchAgentLab → MLOpsLab → K8sLab
+TelcoAgent (bitti) → TemporalLab → ResearchAgentLab → MLOpsLab → K8sLab → ObservabilityLab → IdentityLab
 ```
 
-> ResearchAgentLab'ı TemporalLab'dan sonraya koyduk çünkü AutoGen + Qdrant + MongoDB
-> öğrenmek TelcoAgent'taki bilginin üzerine güzel oturur — aynı problem alanı (agent),
-> farklı araçlarla çözüm.
+> **Neden bu sıra?**
+> - TemporalLab: TelcoAgent'taki event-driven bilginin üzerine workflow orchestration ekler
+> - ResearchAgentLab: LangGraph bilgisinin üzerine AutoGen + farklı DB'ler (Qdrant, MongoDB)
+> - MLOpsLab: Agent bilgisinin üzerine model serving + operationalization
+> - K8sLab: Tüm servisleri production'a taşıma — önceki projelerdeki servisleri deploy edersin
+> - ObservabilityLab: K8s'ten sonra çünkü distributed tracing multi-service ortamda anlamlı
+> - IdentityLab: En bağımsız proje — herhangi bir sırada yapılabilir ama sona koyduk
 
 Her proje tamamlandıkça bu dosyaya "tamamlandı" işareti ekle ve
 mülakatta anlatılacak kararları buraya yaz.

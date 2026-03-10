@@ -35,9 +35,6 @@ dependencies = [
 
     # Observability
     "prometheus-client>=0.21.0",
-    "opentelemetry-api>=1.28.0",
-    "opentelemetry-sdk>=1.28.0",
-    "opentelemetry-exporter-jaeger>=1.21.0",
 
     # Utilities
     "httpx>=0.27.0",

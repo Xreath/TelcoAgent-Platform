@@ -22,6 +22,13 @@ python -m agents.customer_support.main
 # Run an MCP server standalone
 python -m infrastructure.mcp.customer_mcp_server
 
+# Start infrastructure (PostgreSQL, Redis, Kafka, etc.)
+docker compose up -d
+
+# Database migrations (Alembic)
+alembic upgrade head                              # apply all migrations
+alembic revision --autogenerate -m "description"  # generate new migration
+
 # Tests
 pytest
 pytest tests/path/to/test_file.py::test_name  # single test
@@ -35,9 +42,20 @@ mypy .
 
 # Seed mock data
 python scripts/seed_mock_data.py
+
+# Benchmark REST vs MCP
+python scripts/benchmark_protocols.py
 ```
 
-Line length is 120 characters (ruff). Mypy is configured in strict mode.
+Line length is 120 characters (ruff). Mypy is configured in strict mode. pytest uses `asyncio_mode = "auto"`.
+
+### Dev Mode
+
+Set `DEV_MODE=true` in `.env` to bypass JWT authentication. MCP servers also fall back to mock data when their upstream REST service is unreachable.
+
+### Service Ports
+
+Customer `:8001`, Billing `:8002`, Network `:8003`, Campaign `:8004`. Kafka UI `:8082`, Prometheus `:9090`, Grafana `:3000`.
 
 ## Architecture
 
@@ -46,7 +64,7 @@ Line length is 120 characters (ruff). Mypy is configured in strict mode.
 ```
 services/<domain>/       # DDD Bounded Contexts (customer, billing, network, campaign)
 agents/<name>/           # AI agents (customer_support implemented; others stubbed)
-infrastructure/          # Cross-cutting infra (MCP servers, Docker, Keycloak, monitoring)
+infrastructure/          # Cross-cutting infra (MCP servers, Docker, monitoring)
 shared/                  # Reusable base classes, config, database utils
 ```
 
@@ -105,6 +123,11 @@ Copy `.env.example` to `.env`. Services expect:
 - PostgreSQL on `localhost:5432` (db: `telcoagent`, user: `telco`)
 - Redis on `localhost:6379`
 - Kafka on `localhost:9092`
-- Keycloak on `localhost:8080`
 
-DB schema is initialized at startup via SQLAlchemy `create_all`. The `infrastructure/docker/init-db.sql` sets up the `outbox.events` table and pgvector extension.
+DB migrations are managed by Alembic (migration files in `alembic/versions/`). The `infrastructure/docker/init-db.sql` sets up the `outbox.events` table and pgvector extension.
+
+### Security
+
+- **Auth**: Simple JWT (HS256) with RBAC (`agent-operator`, `agent-supervisor`, `agent-auditor`). Middleware in `shared/auth/middleware.py`. Use `create_access_token()` to issue tokens.
+- **Prompt Injection Guard** (`shared/security/`): Scans user text for injection patterns (role hijacking, system prompt extraction, delimiter injection, tool manipulation). HIGH-risk → blocked, MEDIUM-risk → redacted. Supports English and Turkish.
+- **Input Sanitization**: 2000-char limit on user-controlled fields before LLM processing.
