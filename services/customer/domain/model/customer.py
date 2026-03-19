@@ -13,7 +13,20 @@ from services.customer.domain.model.value_objects import (
     PhoneNumber,
     SubscriptionPlan,
 )
+from pydantic import PrivateAttr
+
 from shared.models.base import AggregateRoot
+
+
+class PendingComplaint:
+    """Transient complaint data held by the aggregate until persisted."""
+
+    __slots__ = ("complaint_type", "description", "priority")
+
+    def __init__(self, complaint_type: str, description: str, priority: str) -> None:
+        self.complaint_type = complaint_type
+        self.description = description
+        self.priority = priority
 
 
 class Customer(AggregateRoot):
@@ -27,6 +40,14 @@ class Customer(AggregateRoot):
     subscription_plan: SubscriptionPlan = SubscriptionPlan.PREPAID_BASIC
     clv_score: float = 0.0  # Customer Lifetime Value
     is_active: bool = True
+
+    _pending_complaints: list[PendingComplaint] = PrivateAttr(default_factory=list)
+
+    def collect_complaints(self) -> list[PendingComplaint]:
+        """Return and clear pending complaints — same pattern as collect_events()."""
+        complaints = self._pending_complaints.copy()
+        self._pending_complaints.clear()
+        return complaints
 
     @classmethod
     def create(
@@ -78,6 +99,9 @@ class Customer(AggregateRoot):
         priority: str = "medium",
     ) -> None:
         """File a complaint and raise domain event."""
+        self._pending_complaints.append(
+            PendingComplaint(complaint_type=complaint_type, description=description, priority=priority)
+        )
         self.add_event(
             ComplaintFiled(
                 aggregate_id=str(self.id),

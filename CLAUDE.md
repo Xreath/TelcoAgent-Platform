@@ -16,6 +16,9 @@ uv sync --extra dev  # includes pytest, ruff, mypy
 # Run a service (example: customer service on port 8001)
 uvicorn services.customer.api.main:app --reload --port 8001
 
+# Run Orchestrator (Supervisor agent + Kafka consumer)
+python -m agents.orchestrator.main
+
 # Run CustomerSupportAgent (Kafka consumer + agent loop)
 python -m agents.customer_support.main
 
@@ -47,7 +50,7 @@ python scripts/seed_mock_data.py
 python scripts/benchmark_protocols.py
 ```
 
-Line length is 120 characters (ruff). Mypy is configured in strict mode. pytest uses `asyncio_mode = "auto"`.
+Line length is 120 characters (ruff, rules: E/F/I/N/W/UP). Mypy is configured in strict mode (python 3.11). pytest uses `asyncio_mode = "auto"`.
 
 ### Dev Mode
 
@@ -55,7 +58,7 @@ Set `DEV_MODE=true` in `.env` to bypass JWT authentication. MCP servers also fal
 
 ### Service Ports
 
-Customer `:8001`, Billing `:8002`, Network `:8003`, Campaign `:8004`. Kafka UI `:8082`, Prometheus `:9090`, Grafana `:3000`.
+Customer `:8001`, Billing `:8002`, Network `:8003`, Campaign `:8004`, Customer Support Agent `:8010`. Kafka UI `:8082`, Traefik Dashboard `:8084`, Prometheus `:9090`, Alertmanager `:9093`, Grafana `:3000`.
 
 ## Architecture
 
@@ -63,7 +66,7 @@ Customer `:8001`, Billing `:8002`, Network `:8003`, Campaign `:8004`. Kafka UI `
 
 ```
 services/<domain>/       # DDD Bounded Contexts (customer, billing, network, campaign)
-agents/<name>/           # AI agents (customer_support implemented; others stubbed)
+agents/<name>/           # AI agents (all fully implemented)
 infrastructure/          # Cross-cutting infra (MCP servers, Docker, monitoring)
 shared/                  # Reusable base classes, config, database utils
 ```
@@ -87,20 +90,25 @@ Each `services/<domain>/` follows the same layered DDD structure:
 - `shared/config/settings.py` — `Settings` (pydantic-settings, reads from `.env`). Always use `get_settings()` (LRU-cached singleton).
 - `shared/utils/database.py` — SQLAlchemy async engine and `get_db_session()` FastAPI dependency.
 
-### Agent Structure (`agents/<name>/`)
+### Agent Architecture (`agents/`)
 
-The CustomerSupportAgent is the reference implementation:
+All 5 agents are fully implemented using LangGraph:
 
-- `agent.py` — LangGraph `create_react_agent` with a system prompt; `CustomerSupportAgentRunner` wraps it with memory + metrics, supporting two modes: static tools (default) or dynamic MCP tool discovery.
-- `tools.py` — Static LangChain tools (`get_customer_profile`, `get_billing_info`, `create_ticket`, `send_notification`).
-- `memory.py` — Redis-backed short-term memory per session.
-- `metrics.py` — Prometheus counters/histograms for invocations and tool calls.
-- `kafka_consumer.py` — Consumes `telco.customers.complaints` topic and dispatches to the agent.
-- `main.py` — Entry point that starts the Kafka consumer loop.
+- **Orchestrator** (`agents/orchestrator/`) — LangGraph StateGraph Supervisor. Routes incoming events to the correct specialist via conditional edges. Keyword-based domain classification with JSON fallback. Produces decisions to `telco.agents.decisions`.
+- **CustomerSupportAgent** (`agents/customer_support/`) — LangGraph ReAct. Reference implementation with Redis memory, Prometheus metrics, Kafka consumer. Tools: `get_customer_profile`, `get_billing_info`, `create_ticket`, `send_notification`.
+- **BillingAnalystAgent** (`agents/billing_analyst/`) — LangGraph ReAct with Structured Output. Dispute resolution (approve/reject/partial_refund), anomaly detection.
+- **NetworkDiagnosticAgent** (`agents/network_diagnostic/`) — LangGraph ReAct. System prompt simulates 3 personas (Analyst, Engineer, Manager) for multi-perspective diagnosis.
+- **CampaignAgent** (`agents/campaign/`) — LangGraph ReAct. Segment-targeted content generation, A/B variant creation.
+
+Each agent has `agent.py` (LangGraph agent + Runner class) and `tools.py` (LangChain tools). Agents support two tool modes: static tools (default) or dynamic MCP tool discovery.
+
+### Domain Model Pattern: Pending Complaints
+
+The Customer aggregate uses `_pending_complaints` (same copy+clear pattern as `_pending_events`). `file_complaint()` adds to `_pending_complaints`; `collect_complaints()` returns and clears. Command handler must call `collect_complaints()` after save to persist complaints to DB.
 
 ### MCP Layer (`infrastructure/mcp/`)
 
-- `customer_mcp_server.py` / `billing_mcp_server.py` — FastMCP servers exposing domain tools. Each connects to the corresponding REST service. Fall back to mock data when the service is unreachable (dev mode).
+- 4 FastMCP servers: `customer_mcp_server.py`, `billing_mcp_server.py`, `campaign_mcp_server.py`, `network_mcp_server.py`. Each connects to the corresponding REST service. Falls back to mock data when the service is unreachable.
 - `client.py` — `MCPToolClient` that discovers tools from configured MCP server URLs and returns LangChain-compatible tool objects.
 - `openapi_to_mcp.py` — Auto-generates MCP tool definitions from OpenAPI schemas.
 
@@ -112,22 +120,26 @@ The CustomerSupportAgent is the reference implementation:
 
 Kafka topic namespace: `telco.customers.*`, `telco.billing.*`, `telco.network.*`, `telco.campaigns.*`, `telco.agents.decisions`, `telco.dlq.*`.
 
+Retry: exponential backoff (`base_delay * 2^(attempt-1)`, max 3 retries). Deserialization errors bypass retry → straight to DLQ.
+
 ### LLM Configuration
 
 Uses DeepSeek API (OpenAI-compatible). Set `OPENAI_API_BASE=https://api.deepseek.com/v1` and `OPENAI_API_KEY` in `.env`. The model name in code is `"deepseek-chat"`. LangSmith tracing is enabled by default when `LANGCHAIN_API_KEY` is set.
 
-### Infrastructure Dependencies (local dev)
+### Infrastructure (Docker Compose)
 
-Copy `.env.example` to `.env`. Services expect:
+Copy `.env.example` to `.env`. `docker compose up -d` starts:
 
-- PostgreSQL on `localhost:5432` (db: `telcoagent`, user: `telco`)
-- Redis on `localhost:6379`
-- Kafka on `localhost:9092`
+- **Data**: PostgreSQL+pgvector (`:5432`), Redis (`:6379`), Kafka+ZooKeeper (`:9092`)
+- **Services**: customer-service, billing-service, network-service, campaign-service, customer-support-agent
+- **Gateway**: Traefik v3.2 (`:8084` dashboard) — API routing + service discovery
+- **Monitoring**: Prometheus (`:9090`), Alertmanager (`:9093`), Grafana (`:3000`)
+- **Tools**: Kafka UI (`:8082`)
 
 DB migrations are managed by Alembic (migration files in `alembic/versions/`). The `infrastructure/docker/init-db.sql` sets up the `outbox.events` table and pgvector extension.
 
 ### Security
 
-- **Auth**: Simple JWT (HS256) with RBAC (`agent-operator`, `agent-supervisor`, `agent-auditor`). Middleware in `shared/auth/middleware.py`. Use `create_access_token()` to issue tokens.
+- **Auth**: Self-contained JWT (HS256) with RBAC (`agent-operator`, `agent-supervisor`, `agent-auditor`). Middleware in `shared/auth/middleware.py`. Use `create_access_token()` to issue tokens. No external identity provider.
 - **Prompt Injection Guard** (`shared/security/`): Scans user text for injection patterns (role hijacking, system prompt extraction, delimiter injection, tool manipulation). HIGH-risk → blocked, MEDIUM-risk → redacted. Supports English and Turkish.
 - **Input Sanitization**: 2000-char limit on user-controlled fields before LLM processing.

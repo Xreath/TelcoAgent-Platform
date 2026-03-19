@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from services.customer.domain.model.customer import Customer
 from services.customer.domain.model.value_objects import Address, CustomerSegment, PhoneNumber, SubscriptionPlan
 from services.customer.domain.repository import CustomerRepository
-from services.customer.infrastructure.orm_models import CustomerORM
+from services.customer.infrastructure.orm_models import ComplaintORM, CustomerORM
 
 
 class PostgresCustomerRepository(CustomerRepository):
@@ -30,6 +30,17 @@ class PostgresCustomerRepository(CustomerRepository):
             # Insert new record
             orm = CustomerORM(**self._to_orm_dict(customer), id=customer.id)
             self._session.add(orm)
+
+        # Persist any pending complaints collected by the aggregate
+        for c in customer.collect_complaints():
+            self._session.add(
+                ComplaintORM(
+                    customer_id=customer.id,
+                    complaint_type=c.complaint_type,
+                    description=c.description,
+                    priority=c.priority,
+                )
+            )
 
         await self._session.flush()
         return customer
